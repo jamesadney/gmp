@@ -39,16 +39,17 @@ hand a Go pointer to C code but must separately arrange for
 Go to hang on to a reference to the pointer until C is done with it.
 */
 
-package gmp
+package gogmp
 
+// #cgo LDFLAGS: -lgmp
 // #include <gmp.h>
 // #include <stdlib.h>
 import "C"
 
 import (
 	"os"
-	"unsafe"
 	"strconv"
+	"unsafe"
 )
 
 /*
@@ -128,15 +129,15 @@ func (z *Int) SetInt64(x int64) *Int {
 // SetString interprets s as a number in the given base
 // and sets z to that value.  The base must be in the range [2,36].
 // SetString returns an error if s cannot be parsed or the base is invalid.
-func (z *Int) SetString(s string, base int) os.Error {
+func (z *Int) SetString(s string, base int) error {
 	z.doinit()
 	if base < 2 || base > 36 {
-		return os.EINVAL
+		return os.ErrInvalid
 	}
 	p := C.CString(s)
 	defer C.free(unsafe.Pointer(p))
 	if C.mpz_set_str(&z.i[0], p, C.int(base)) < 0 {
-		return os.EINVAL
+		return os.ErrInvalid
 	}
 	return nil
 }
@@ -147,12 +148,12 @@ func (z *Int) String() string {
 	return s
 }
 
-func (z *Int) StringBase(base int) (string, os.Error) {
+func (z *Int) StringBase(base int) (string, error) {
 	if z == nil {
 		return "nil", nil
 	}
 	if base < 2 || base > 36 {
-		return "", os.EINVAL
+		return "", os.ErrInvalid
 	}
 	z.doinit()
 	p := C.mpz_get_str(nil, C.int(base), &z.i[0])
@@ -170,7 +171,6 @@ func (z *Int) destroy() {
 func (z *Int) Clear() {
 	z.destroy()
 }
-
 
 /*
  * arithmetic
@@ -281,7 +281,6 @@ func (z *Int) Abs(x *Int) *Int {
 	return z
 }
 
-
 /*
  * functions without a clear receiver
  */
@@ -334,33 +333,17 @@ func (z *Int) ProbablyPrime(n int) bool {
 	return int(C.mpz_probab_prime_p(&z.i[0], C.int(n))) > 0
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 type Float struct {
-	i C.mpf_t
+	i    C.mpf_t
 	init bool
 	prec uint // 0 = use the default precision
 }
 
 // NewInt returns a new Int initialized to x.
-func NewFloat(x float) *Float { return new(Float).SetDouble(x) }
+func NewFloat(x float64) *Float { return new(Float).SetDouble(x) }
 
 // NewInt returns a new Int initialized to x, with precision prec.
-func NewFloat2(x float, prec uint) *Float {
+func NewFloat2(x float64, prec uint) *Float {
 	f := new(Float)
 	f.prec = prec
 	f.SetDouble(x)
@@ -400,7 +383,7 @@ func (f *Float) SetSint(x int) *Float {
 }
 
 // SetDouble sets f = x and returns f.
-func (f *Float) SetDouble(x float) *Float {
+func (f *Float) SetDouble(x float64) *Float {
 	f.doinit()
 	C.mpf_set_d(&f.i[0], C.double(x))
 	return f
@@ -409,25 +392,25 @@ func (f *Float) SetDouble(x float) *Float {
 // SetString interprets s as a number in the given base
 // and sets f to that value.  The base must be in the range [2,36].
 // SetString returns an error if s cannot be parsed or the base is invalid.
-func (f *Float) SetString(s string, base int) os.Error {
+func (f *Float) SetString(s string, base int) error {
 	f.doinit()
 	if base < 2 || base > 36 {
-		return os.EINVAL
+		return os.ErrInvalid
 	}
 	p := C.CString(s)
 	defer C.free(unsafe.Pointer(p))
 	if C.mpf_set_str(&f.i[0], p, C.int(base)) < 0 {
-		return os.EINVAL
+		return os.ErrInvalid
 	}
 	return nil
 }
 
-func (f *Float) StringBase(base int, ndigits uint) (string, os.Error) {
+func (f *Float) StringBase(base int, ndigits uint) (string, error) {
 	if f == nil {
 		return "nil", nil
 	}
 	if base < 2 || base > 36 {
-		return "", os.EINVAL
+		return "", os.ErrInvalid
 	}
 	f.doinit()
 	var exp_ C.mp_exp_t
@@ -436,8 +419,10 @@ func (f *Float) StringBase(base int, ndigits uint) (string, os.Error) {
 	s := C.GoString(p)
 	C.free(unsafe.Pointer(p))
 
-	if len(s) == 0 {return "0", nil}
-	
+	if len(s) == 0 {
+		return "0", nil
+	}
+
 	if exp > 0 && exp < len(s) {
 		return s[:exp] + "." + s[exp:], nil
 	}
@@ -450,27 +435,25 @@ func (f *Float) String() string {
 	return s
 }
 
-func (f *Float) Double() float {
+func (f *Float) Double() float64 {
 	f.doinit()
-	return float(C.mpf_get_d(&f.i[0]))
+	return float64(C.mpf_get_d(&f.i[0]))
 }
 
- 
 func (f *Float) Sint() int {
 	f.doinit()
 	return int(C.mpf_get_si(&f.i[0]))
 }
 
-
- /* 
-  * Convert f to a `double', truncating if necessary (ie. rounding
-  * towards zero), and with an exponent returned separately.
-  */
-func (f *Float) Double2Exp() (d float, exp int) {
+/* 
+ * Convert f to a `double', truncating if necessary (ie. rounding
+ * towards zero), and with an exponent returned separately.
+ */
+func (f *Float) Double2Exp() (d float64, exp int) {
 	var exp_ C.long
-	d = float(C.mpf_get_d_2exp(&exp_, &f.i[0]))
+	d = float64(C.mpf_get_d_2exp(&exp_, &f.i[0]))
 	exp = int(exp_)
- 	return
+	return
 }
 
 func (f *Float) destroy() {
@@ -520,7 +503,6 @@ func (f *Float) Add(x, y *Float) *Float {
 	C.mpf_add(&f.i[0], &x.i[0], &y.i[0])
 	return f
 }
-
 
 func (f *Float) AddUint(x *Float, y uint) *Float {
 	x.doinit()
@@ -620,7 +602,7 @@ func (f *Float) Abs(x *Float) *Float {
 	x.doinit()
 	f.doinit()
 	C.mpf_abs(&f.i[0], &x.i[0])
- 	return f
+	return f
 }
 
 // Mul2Exp sets z = x * 2^s and returns z.
@@ -638,7 +620,6 @@ func (f *Float) Div2Exp(x *Float, s uint) *Float {
 	C.mpf_div_2exp(&f.i[0], &x.i[0], C.mp_bitcnt_t(s))
 	return f
 }
-
 
 /* 
  * Comparison
@@ -672,7 +653,6 @@ func (f *Float) Sgn() int {
 	return 1
 }
 
-
 /*
  * functions without a clear receiver
  */
@@ -690,7 +670,7 @@ func CmpFloat(x, y *Float) int {
 	return int(C.mpf_cmp(&x.i[0], &y.i[0]))
 }
 
-func CmpFloatDouble(x *Float, y float) int {
+func CmpFloatDouble(x *Float, y float64) int {
 	x.doinit()
 	return int(C.mpf_cmp_d(&x.i[0], C.double(y)))
 }
@@ -706,11 +686,11 @@ func CmpFloatSint(x *Float, y int) int {
 }
 
 /* Return non-zero if the first n bits of x and y are equal,
-      zero otherwise.  I.e., test if x and y are approximately equal. */
+   zero otherwise.  I.e., test if x and y are approximately equal. */
 func EqFloat(x, y *Float, n uint) int {
 	x.doinit()
 	y.doinit()
-	return int(C.mpf_eq(&x.i[0], &y.i[0], C.ulong(n)))
+	return int(C.mpf_eq(&x.i[0], &y.i[0], C.mp_bitcnt_t(n)))
 }
 
 func SwapFloat(x, y *Float) {
@@ -750,14 +730,13 @@ func (f *Float) IsInteger() bool {
 
 //TODO(ug) mpf_fits_* and random functions
 
-
 type Rat struct {
-	i C.mpq_t
+	i    C.mpq_t
 	init bool
 }
 
 // NewRat returns a new Rat initialized to x/y.
-func NewRat(x int, y uint) *Rat { return new(Rat).SetSint(x,y) }
+func NewRat(x int, y uint) *Rat { return new(Rat).SetSint(x, y) }
 
 // Int promises that the zero value is a 0, but in gmp
 // the zero value is a crash.  To bridge the gap, the
@@ -781,7 +760,7 @@ func (q *Rat) Set(x *Rat) *Rat {
 }
 
 // SetSint sets q to x/y and returns q.
-func (q *Rat) SetSint(x int y uint) *Rat {
+func (q *Rat) SetSint(x int, y uint) *Rat {
 	q.doinit()
 	C.mpq_set_si(&q.i[0], C.long(x), C.ulong(y))
 	return q
@@ -805,15 +784,15 @@ func (q *Rat) SetInt(x *Int) *Rat {
 // SetString interprets s as a number in the given base
 // and sets z to that value.  The base must be in the range [2,36].
 // SetString returns an error if s cannot be parsed or the base is invalid.
-func (q *Rat) SetString(s string, base int) os.Error {
+func (q *Rat) SetString(s string, base int) error {
 	q.doinit()
 	if base < 2 || base > 36 {
-		return os.EINVAL
+		return os.ErrInvalid
 	}
 	p := C.CString(s)
 	defer C.free(unsafe.Pointer(p))
 	if C.mpq_set_str(&q.i[0], p, C.int(base)) < 0 {
-		return os.EINVAL
+		return os.ErrInvalid
 	}
 	return nil
 }
@@ -825,12 +804,12 @@ func SwapRat(x, y *Rat) {
 }
 
 // String returns the decimal representation of z.
-func (q *Rat) StringBase(base int) (string, os.Error) {
+func (q *Rat) StringBase(base int) (string, error) {
 	if q == nil {
 		return "nil", nil
 	}
 	if base < 2 || base > 36 {
-		return "", os.EINVAL
+		return "", os.ErrInvalid
 	}
 	q.doinit()
 	p := C.mpq_get_str(nil, C.int(base), &q.i[0])
@@ -844,13 +823,13 @@ func (q *Rat) String() string {
 	return s
 }
 
-func (q *Rat) Double() float {
+func (q *Rat) Double() float64 {
 	q.doinit()
-	return float(C.mpq_get_d(&q.i[0]))
+	return float64(C.mpq_get_d(&q.i[0]))
 }
 
 // SetDouble sets f = x and returns q.
-func (q *Rat) SetDouble(x float) *Rat {
+func (q *Rat) SetDouble(x float64) *Rat {
 	q.doinit()
 	C.mpq_set_d(&q.i[0], C.double(x))
 	return q
@@ -862,7 +841,6 @@ func (q *Rat) SetFloat(x *Float) *Rat {
 	C.mpq_set_f(&q.i[0], &x.i[0])
 	return q
 }
-
 
 func (q *Rat) destroy() {
 	if q.init {
@@ -941,7 +919,7 @@ func (q *Rat) Div2Exp(x *Rat, s uint) *Rat {
 func CmpRat(x, y *Rat) int {
 	x.doinit()
 	y.doinit()
-	return int(C.mpq_cmp(&x.i[0],&y.i[0]))
+	return int(C.mpq_cmp(&x.i[0], &y.i[0]))
 }
 
 func CmpRatUint(q *Rat, x, y uint) int {
