@@ -8,18 +8,6 @@
 // license that can be found in the LICENSE file.
 
 /*
-In this package:
-Float -> mpf_t
-Int -> mpt_z
-Rat -> mpf_q
-
-Double -> float
-Sint -> int
-Uint -> uint
-
-I know they don't look great ---but I had to do something
-to avoid ambiguity.
-
 I provided with the Clean() function as well, since GC
 does not call destory() at this stage.
 */
@@ -75,7 +63,7 @@ type Int struct {
 }
 
 // NewInt returns a new Int initialized to x.
-func NewInt(x int) *Int { return new(Int).SetSint(x) }
+func NewInt(x int64) *Int { return new(Int).SetInt64(x) }
 
 // Int promises that the zero value is a 0, but in gmp
 // the zero value is a crash.  To bridge the gap, the
@@ -117,24 +105,19 @@ func (z *Int) Set(x *Int) *Int {
 func (z *Int) SetBytes(b []byte) *Int {
 	z.doinit()
 	if len(b) == 0 {
-		z.SetSint(0)
+		z.SetInt64(0)
 	} else {
 		C.mpz_import(&z.i[0], C.size_t(len(b)), 1, 1, 1, 0, unsafe.Pointer(&b[0]))
 	}
 	return z
 }
 
-// SetSint sets z = x and returns z.
-func (z *Int) SetSint(x int) *Int {
+// SetInt64 sets z = x and returns z.
+func (z *Int) SetInt64(x int64) *Int {
 	z.doinit()
 	// TODO(rsc): more work on 32-bit platforms
 	C.mpz_set_si(&z.i[0], C.long(x))
 	return z
-}
-
-// Provided for compatibility with big package
-func (z *Int) SetInt64(x int64) *Int {
-	return z.SetSint(int(x))
 }
 
 // SetString interprets s as a number in the given base
@@ -179,6 +162,7 @@ func (z *Int) destroy() {
 	}
 	z.init = false
 }
+
 func (z *Int) Clear() {
 	z.destroy()
 }
@@ -264,16 +248,11 @@ func (z *Int) Exp(x, y, m *Int) *Int {
 	return z
 }
 
-func (z *Int) Sint() int {
+func (z *Int) Int64() int64 {
 	if !z.init {
 		return 0
 	}
-	return int(C.mpz_get_si(&z.i[0]))
-}
-
-// Provided for compatibility with big package
-func (z *Int) Int64() int64 {
-	return int64(z.Sint())
+	return int64(C.mpz_get_si(&z.i[0]))
 }
 
 // Neg sets z = -x and returns z.
@@ -351,13 +330,13 @@ type Float struct {
 }
 
 // NewInt returns a new Int initialized to x.
-func NewFloat(x float64) *Float { return new(Float).SetDouble(x) }
+func NewFloat(x float64) *Float { return new(Float).SetFloat64(x) }
 
 // NewInt returns a new Int initialized to x, with precision prec.
 func NewFloat2(x float64, prec uint) *Float {
 	f := new(Float)
 	f.prec = prec
-	f.SetDouble(x)
+	f.SetFloat64(x)
 	return f
 }
 
@@ -387,14 +366,14 @@ func (f *Float) Set(x *Float) *Float {
 }
 
 // SetInt sets f = x and returns f.
-func (f *Float) SetSint(x int) *Float {
+func (f *Float) SetInt64(x int64) *Float {
 	f.doinit()
 	C.mpf_set_si(&f.i[0], C.long(x))
 	return f
 }
 
-// SetDouble sets f = x and returns f.
-func (f *Float) SetDouble(x float64) *Float {
+// SetFloat64 sets f = x and returns f.
+func (f *Float) SetFloat64(x float64) *Float {
 	f.doinit()
 	C.mpf_set_d(&f.i[0], C.double(x))
 	return f
@@ -446,21 +425,21 @@ func (f *Float) String() string {
 	return s
 }
 
-func (f *Float) Double() float64 {
+func (f *Float) Float64() float64 {
 	f.doinit()
 	return float64(C.mpf_get_d(&f.i[0]))
 }
 
-func (f *Float) Sint() int {
+func (f *Float) Int64() int64 {
 	f.doinit()
-	return int(C.mpf_get_si(&f.i[0]))
+	return int64(C.mpf_get_si(&f.i[0]))
 }
 
-/* 
- * Convert f to a `double', truncating if necessary (ie. rounding
- * towards zero), and with an exponent returned separately.
- */
-func (f *Float) Double2Exp() (d float64, exp int) {
+// FIXME: Float2Exp is inconsistent, Float642Exp is silly.
+
+// Convert f to a float64, truncating if necessary (ie. rounding
+// towards zero), and with an exponent returned separately.
+func (f *Float) Float2Exp() (d float64, exp int) {
 	var exp_ C.long
 	d = float64(C.mpf_get_d_2exp(&exp_, &f.i[0]))
 	exp = int(exp_)
@@ -632,7 +611,7 @@ func (f *Float) Div2Exp(x *Float, s uint) *Float {
 	return f
 }
 
-/* 
+/*
  * Comparison
  * /
 
@@ -681,7 +660,7 @@ func CmpFloat(x, y *Float) int {
 	return int(C.mpf_cmp(&x.i[0], &y.i[0]))
 }
 
-func CmpFloatDouble(x *Float, y float64) int {
+func CmpFloatFloat64(x *Float, y float64) int {
 	x.doinit()
 	return int(C.mpf_cmp_d(&x.i[0], C.double(y)))
 }
@@ -691,7 +670,7 @@ func CmpFloatUint(x *Float, y uint) int {
 	return int(C.mpf_cmp_ui(&x.i[0], C.ulong(y)))
 }
 
-func CmpFloatSint(x *Float, y int) int {
+func CmpFloatInt64(x *Float, y int64) int {
 	x.doinit()
 	return int(C.mpf_cmp_si(&x.i[0], C.long(y)))
 }
@@ -747,7 +726,7 @@ type Rat struct {
 }
 
 // NewRat returns a new Rat initialized to x/y.
-func NewRat(x int, y uint) *Rat { return new(Rat).SetSint(x, y) }
+func NewRat(x int64, y uint) *Rat { return new(Rat).SetInt64(x, y) }
 
 // Int promises that the zero value is a 0, but in gmp
 // the zero value is a crash.  To bridge the gap, the
@@ -770,8 +749,8 @@ func (q *Rat) Set(x *Rat) *Rat {
 	return q
 }
 
-// SetSint sets q to x/y and returns q.
-func (q *Rat) SetSint(x int, y uint) *Rat {
+// SetInt64 sets q to x/y and returns q.
+func (q *Rat) SetInt64(x int64, y uint) *Rat {
 	q.doinit()
 	C.mpq_set_si(&q.i[0], C.long(x), C.ulong(y))
 	return q
@@ -834,13 +813,13 @@ func (q *Rat) String() string {
 	return s
 }
 
-func (q *Rat) Double() float64 {
+func (q *Rat) Float64() float64 {
 	q.doinit()
 	return float64(C.mpq_get_d(&q.i[0]))
 }
 
-// SetDouble sets f = x and returns q.
-func (q *Rat) SetDouble(x float64) *Rat {
+// SetFloat64 sets f = x and returns q.
+func (q *Rat) SetFloat64(x float64) *Rat {
 	q.doinit()
 	C.mpq_set_d(&q.i[0], C.double(x))
 	return q
@@ -939,7 +918,7 @@ func CmpRatUint(q *Rat, x, y uint) int {
 	//return int(C.mpq_cmp_ui(&x.i[0], C.ulong(x), C.ulong(y)))
 }
 
-func CmpRatSint(q *Rat, x int, y uint) int {
+func CmpRatInt64(q *Rat, x int64, y uint) int {
 	q.doinit()
 	return 0 // FIXME(ug): Macro...
 	//return int(C.mpq_cmp_ui(&x.i[0], C.long(x), C.ulong(y)))
@@ -994,4 +973,4 @@ func (q *Rat) SetDen(n *Int) *Rat {
 	return q
 }
 
-// TODO(ug): mpq_numref, mpq_denref 
+// TODO(ug): mpq_numref, mpq_denref
