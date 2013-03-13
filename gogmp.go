@@ -12,21 +12,6 @@ I provided with the Clean() function as well, since GC
 does not call destory() at this stage.
 */
 
-/*
-Garbage collection is the big problem.  It is fine for the Go world to
-have pointers into the C world and to free those pointers when they
-are no longer needed.  To help, the garbage collector calls an
-object's destroy() method prior to collecting it.  C pointers can be
-wrapped by Go objects with appropriate destroy methods.
-
-It is much more difficult for the C world to have pointers into the Go
-world, because the Go garbage collector is unaware of the memory
-allocated by C.  The most important consideration is not to
-constrain future implementations, so the rule is that Go code can
-hand a Go pointer to C code but must separately arrange for
-Go to hang on to a reference to the pointer until C is done with it.
-*/
-
 package gogmp
 
 /*
@@ -613,12 +598,10 @@ func (f *Float) Div2Exp(x *Float, s uint) *Float {
 
 /*
  * Comparison
- * /
+ */
 
-
-/* Compute the relative difference between x and y and store the
-      result in f.  This is abs(x-y)/x. */
-
+// Compute the relative difference between x and y and store the result in f.
+// This is abs(x-y)/x.
 func (f *Float) RelDiff(x, y *Float) *Float {
 	x.doinit()
 	y.doinit()
@@ -627,7 +610,7 @@ func (f *Float) RelDiff(x, y *Float) *Float {
 	return f
 }
 
-/* Return +1 if f > 0, 0 if f = 0, and -1 if f < 0. */
+// Return +1 if f > 0, 0 if f = 0, and -1 if f < 0.
 func (f *Float) Sgn() int {
 	f.doinit()
 	//TODO(ug): mpf_sgn seems to be implemented as a macro.
@@ -653,7 +636,6 @@ func (f *Float) Sgn() int {
 //    0 if x == y
 //   pos if x >  y
 //
-
 func CmpFloat(x, y *Float) int {
 	x.doinit()
 	y.doinit()
@@ -675,8 +657,8 @@ func CmpFloatInt64(x *Float, y int64) int {
 	return int(C.mpf_cmp_si(&x.i[0], C.long(y)))
 }
 
-/* Return non-zero if the first n bits of x and y are equal,
-   zero otherwise.  I.e., test if x and y are approximately equal. */
+// Return non-zero if the first n bits of x and y are equal,
+// zero otherwise.  I.e., test if x and y are approximately equal.
 func EqFloat(x, y *Float, n uint) int {
 	x.doinit()
 	y.doinit()
