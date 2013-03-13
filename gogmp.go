@@ -12,7 +12,7 @@ I provided with the Clean() function as well, since GC
 does not call destory() at this stage.
 */
 
-package gogmp
+package gmp
 
 /*
 #cgo LDFLAGS: -lgmp
