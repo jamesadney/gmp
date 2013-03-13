@@ -15,6 +15,6 @@ Go source.
 
 http://godoc.org/github.com/jamesadney/gmp
 
-or you cand use `godoc`:
+or you can use `godoc`:
 
     godoc github.com/jamesadney/gmp
