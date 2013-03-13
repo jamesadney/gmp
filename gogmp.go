@@ -202,6 +202,16 @@ func (z *Int) Mod(x, y *Int) *Int {
 	return z
 }
 
+// ModInverse sets z to the multiplicative inverse of g in the group ℤ/pℤ
+// (where p is a prime) and returns z.
+func (z *Int) ModInverse(g, p *Int) *Int {
+	g.doinit()
+	p.doinit()
+	z.doinit()
+	C.mpz_invert(&z.i[0], &g.i[0], &p.i[0])
+	return z
+}
+
 // Lsh sets z = x << s and returns z.
 func (z *Int) Lsh(x *Int, s uint) *Int {
 	x.doinit()
@@ -230,6 +240,14 @@ func (z *Int) Exp(x, y, m *Int) *Int {
 		m.doinit()
 		C.mpz_powm(&z.i[0], &x.i[0], &y.i[0], &m.i[0])
 	}
+	return z
+}
+
+// Sqrt sets z = floor(sqrt(x)) and returns z.
+func (z *Int) Sqrt(x *Int) *Int {
+	z.doinit()
+	x.doinit()
+	C.mpz_sqrt(&z.i[0], &x.i[0])
 	return z
 }
 
