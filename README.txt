@@ -1,7 +1,7 @@
 PACKAGE
 
 package gogmp
-    import "github.com/i-neda/gogmp"
+    import "github.com/jamesadney/gmp"
 
 
 FUNCTIONS
