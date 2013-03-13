@@ -1,4 +1,4 @@
-# Introduction
+# go-gmp
 
 `go get github.com/jamesadney/gmp`
 
