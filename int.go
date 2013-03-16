@@ -281,17 +281,13 @@ func (z *Int) Sign() int {
 	return int(C._mpz_sgn(&z.i[0]))
 }
 
-/*
- * functions without a clear receiver
- */
-
-// CmpInt compares x and y. The result is
+// Cmp compares x and y. The result is
 //
 //   -1 if x <  y
 //    0 if x == y
 //   +1 if x >  y
 //
-func CmpInt(x, y *Int) int {
+func (x *Int) Cmp(y *Int) int {
 	x.doinit()
 	y.doinit()
 	switch cmp := C.mpz_cmp(&x.i[0], &y.i[0]); {
@@ -302,6 +298,10 @@ func CmpInt(x, y *Int) int {
 	}
 	return +1
 }
+
+/*
+ * functions without a clear receiver
+ */
 
 // DivModInt sets q = x / y and r = x % y.
 func DivModInt(q, r, x, y *Int) {
