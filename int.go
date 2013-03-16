@@ -101,20 +101,21 @@ func (z *Int) SetInt64(x int64) *Int {
 	return z
 }
 
-// SetString interprets s as a number in the given base
-// and sets z to that value.  The base must be in the range [2,36].
-// SetString returns an error if s cannot be parsed or the base is invalid.
-func (z *Int) SetString(s string, base int) error {
+// SetString sets z to the value of s, interpreted in the given base,
+// and returns z and a boolean indicating success. The base must be in the
+// range [2,36]. If SetString fails, the value of z is undefined but the
+// returned value is nil.
+func (z *Int) SetString(s string, base int) (*Int, bool) {
 	z.doinit()
 	if base < 2 || base > 36 {
-		return os.ErrInvalid
+		return nil, false
 	}
 	p := C.CString(s)
 	defer C.free(unsafe.Pointer(p))
 	if C.mpz_set_str(&z.i[0], p, C.int(base)) < 0 {
-		return os.ErrInvalid
+		return nil, false
 	}
-	return nil
+	return z, true
 }
 
 // String returns the decimal representation of z.
