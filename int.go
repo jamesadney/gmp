@@ -22,6 +22,11 @@ void _mpz_mul_2exp(mpz_ptr a, mpz_ptr b, unsigned long n) {
 void _mpz_div_2exp(mpz_ptr a, mpz_ptr b, unsigned long n) {
 	mpz_div_2exp(a, b, n);
 }
+
+// since mpz_sgn is a macro we have to wrap it in a function.
+int _mpz_sgn(mpz_ptr z) {
+	return mpz_sgn(z);
+}
 */
 import "C"
 
@@ -263,6 +268,17 @@ func (z *Int) Abs(x *Int) *Int {
 	z.doinit()
 	C.mpz_abs(&z.i[0], &x.i[0])
 	return z
+}
+
+// Sign returns:
+//
+//	-1 if x <  0
+//	 0 if x == 0
+//	+1 if x >  0
+//
+func (z *Int) Sign() int {
+	z.doinit()
+	return int(C._mpz_sgn(&z.i[0]))
 }
 
 /*
