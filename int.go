@@ -180,8 +180,10 @@ func (z *Int) Mul(x, y *Int) *Int {
 	return z
 }
 
-// Div sets z = x / y, rounding toward zero, and returns z.
-func (z *Int) Div(x, y *Int) *Int {
+// Quo sets z to the quotient x/y for y != 0 and returns z.
+// If y == 0, a division-by-zero run-time panic occurs.
+// Quo implements truncated division (like Go).
+func (z *Int) Quo(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
@@ -189,14 +191,36 @@ func (z *Int) Div(x, y *Int) *Int {
 	return z
 }
 
-// Mod sets z = x % y and returns z.
-// Like the result of the Go % operator, z has the same sign as x.
-func (z *Int) Mod(x, y *Int) *Int {
+// Rem sets z to the remainder x%y for y != 0 and returns z.
+// If y == 0, a division-by-zero run-time panic occurs.
+// Rem implements truncated modulus (like Go); see QuoRem for more details.
+func (z *Int) Rem(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
 	C.mpz_tdiv_r(&z.i[0], &x.i[0], &y.i[0])
 	return z
+}
+
+// QuoRem sets z to the quotient x/y and r to the remainder x%y
+// and returns the pair (z, r) for y != 0.
+// If y == 0, a division-by-zero run-time panic occurs.
+//
+// QuoRem implements T-division and modulus (like Go):
+//
+//	q = x/y      with the result truncated to zero
+//	r = x - y*q
+//
+// (See Daan Leijen, ``Division and Modulus for Computer Scientists''.)
+// See DivMod for Euclidean division and modulus (unlike Go).
+//
+func (z *Int) QuoRem(x, y, r *Int) (*Int, *Int) {
+	x.doinit()
+	y.doinit()
+	r.doinit()
+	z.doinit()
+	C.mpz_tdiv_qr(&z.i[0], &r.i[0], &x.i[0], &y.i[0])
+	return z, r
 }
 
 // ModInverse sets z to the multiplicative inverse of g in the group ℤ/pℤ
