@@ -35,6 +35,8 @@ import (
 	"unsafe"
 )
 
+var intOne = NewInt(1)
+
 // An Int represents a signed multi-precision integer.
 // The zero value for an Int represents the value 0.
 type Int struct {
@@ -221,6 +223,76 @@ func (z *Int) QuoRem(x, y, r *Int) (*Int, *Int) {
 	z.doinit()
 	C.mpz_tdiv_qr(&z.i[0], &r.i[0], &x.i[0], &y.i[0])
 	return z, r
+}
+
+// Div sets z to the quotient x/y for y != 0 and returns z.
+// If y == 0, a division-by-zero run-time panic occurs.
+// Div implements Euclidean division (unlike Go); see DivMod for more details.
+func (z *Int) Div(x, y *Int) *Int {
+	y_neg := y.Sign() == -1 // z may be an alias for y
+	var r Int
+	z.QuoRem(x, y, &r)
+	if r.Sign() == -1 {
+		if y_neg {
+			z.Add(z, intOne)
+		} else {
+			z.Sub(z, intOne)
+		}
+	}
+	return z
+}
+
+// Mod sets z to the modulus x%y for y != 0 and returns z.
+// If y == 0, a division-by-zero run-time panic occurs.
+// Mod implements Euclidean modulus (unlike Go); see DivMod for more details.
+func (z *Int) Mod(x, y *Int) *Int {
+	y0 := y // save y
+	if z == y {
+		y0 = new(Int).Set(y)
+	}
+	var q Int
+	q.QuoRem(x, y, z)
+	if z.Sign() == -1 {
+		if y0.Sign() == -1 {
+			z.Sub(z, y0)
+		} else {
+			z.Add(z, y0)
+		}
+	}
+	return z
+}
+
+// DivMod sets z to the quotient x div y and m to the modulus x mod y
+// and returns the pair (z, m) for y != 0.
+// If y == 0, a division-by-zero run-time panic occurs.
+//
+// DivMod implements Euclidean division and modulus (unlike Go):
+//
+//	q = x div y  such that
+//	m = x - y*q  with 0 <= m < |q|
+//
+// (See Raymond T. Boute, ``The Euclidean definition of the functions
+// div and mod''. ACM Transactions on Programming Languages and
+// Systems (TOPLAS), 14(2):127-144, New York, NY, USA, 4/1992.
+// ACM press.)
+// See QuoRem for T-division and modulus (like Go).
+//
+func (z *Int) DivMod(x, y, m *Int) (*Int, *Int) {
+	y0 := y // save y
+	if z == y {
+		y0 = new(Int).Set(y)
+	}
+	z.QuoRem(x, y, m)
+	if m.Sign() == -1 {
+		if y0.Sign() == -1 {
+			z.Add(z, intOne)
+			m.Sub(m, y0)
+		} else {
+			z.Sub(z, intOne)
+			m.Add(m, y0)
+		}
+	}
+	return z, m
 }
 
 // ModInverse sets z to the multiplicative inverse of g in the group ℤ/pℤ
