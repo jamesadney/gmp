@@ -400,15 +400,6 @@ func (x *Int) Cmp(y *Int) int {
  * functions without a clear receiver
  */
 
-// DivModInt sets q = x / y and r = x % y.
-func DivModInt(q, r, x, y *Int) {
-	q.doinit()
-	r.doinit()
-	x.doinit()
-	y.doinit()
-	C.mpz_tdiv_qr(&q.i[0], &r.i[0], &x.i[0], &y.i[0])
-}
-
 // GcdInt sets d to the greatest common divisor of a and b,
 // which must be positive numbers.
 // If x and y are not nil, GcdInt sets x and y such that d = a*x + b*y.
