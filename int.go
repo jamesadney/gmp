@@ -249,6 +249,7 @@ func (z *Int) Mod(x, y *Int) *Int {
 	y0 := y // save y
 	if z == y {
 		y0 = new(Int).Set(y)
+		defer y0.Clear()
 	}
 	var q Int
 	q.QuoRem(x, y, z)
@@ -281,6 +282,7 @@ func (z *Int) DivMod(x, y, m *Int) (*Int, *Int) {
 	y0 := y // save y
 	if z == y {
 		y0 = new(Int).Set(y)
+		defer y0.Clear()
 	}
 	z.QuoRem(x, y, m)
 	if m.Sign() == -1 {
