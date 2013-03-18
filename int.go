@@ -323,13 +323,20 @@ func (z *Int) Rsh(x *Int, s uint) *Int {
 	return z
 }
 
-// Exp sets z = x^y % m and returns z.
-// If m == nil, Exp sets z = x^y.
+// Exp sets z = x^y % m and returns z. If m != nil, negative exponents are
+// allowed if x^-1 mod m exists. If the inverse doesn't exist then a
+// divsion-by-zero run-time panic occurs.
+//
+// If m == nil, Exp sets z = x^y for positive y and 1 for negative y.
 func (z *Int) Exp(x, y, m *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	if m == nil {
+	if m == nil || m.Cmp(intZero) == 0 {
+		if y.Sign() == -1 {
+			z := NewInt(1)
+			return z
+		}
 		C.mpz_pow_ui(&z.i[0], &x.i[0], C.mpz_get_ui(&y.i[0]))
 	} else {
 		m.doinit()
