@@ -107,9 +107,13 @@ func (z *Int) SetInt64(x int64) *Int {
 }
 
 // SetString sets z to the value of s, interpreted in the given base,
-// and returns z and a boolean indicating success. The base must be in the
-// range [2,36]. If SetString fails, the value of z is undefined but the
-// returned value is nil.
+// and returns z and a boolean indicating success. If SetString fails, the
+// value of z is undefined but the returned value is nil.
+
+// The base argument must be 0 or a value from 2 through 36. If the base is 0,
+// the string prefix determines the actual conversion base. A prefix of “0x” or
+// “0X” selects base 16; the “0” prefix selects base 8, and a “0b” or “0B”
+// prefix selects base 2. Otherwise the selected base is 10.
 func (z *Int) SetString(s string, base int) (*Int, bool) {
 	z.doinit()
 	if base < 0 || base == 1 || base > 36 {
@@ -347,7 +351,7 @@ func (z *Int) Rsh(x *Int, s uint) *Int {
 
 // Exp sets z = x^y % m and returns z. If m != nil, negative exponents are
 // allowed if x^-1 mod m exists. If the inverse doesn't exist then a
-// divsion-by-zero run-time panic occurs.
+// division-by-zero run-time panic occurs.
 //
 // If m == nil, Exp sets z = x^y for positive y and 1 for negative y.
 func (z *Int) Exp(x, y, m *Int) *Int {
