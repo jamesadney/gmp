@@ -112,9 +112,28 @@ func (z *Int) SetInt64(x int64) *Int {
 // returned value is nil.
 func (z *Int) SetString(s string, base int) (*Int, bool) {
 	z.doinit()
-	if base < 2 || base > 36 {
+	if base < 0 || base == 1 || base > 36 {
 		return nil, false
 	}
+
+	// no need to call mpz_set_str here.
+	if len(s) == 0 {
+		return nil, false
+	}
+
+	// positive signs should be ignored
+	if s[0] == '+' {
+		s = s[1:]
+	}
+
+	// attempting to set "0x" and "0b" should return nil like math/big
+	if len(s) == 2 {
+		switch s {
+		case "0x", "0X", "0b", "0B":
+			return nil, false
+		}
+	}
+
 	p := C.CString(s)
 	defer C.free(unsafe.Pointer(p))
 	if C.mpz_set_str(&z.i[0], p, C.int(base)) < 0 {
