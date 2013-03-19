@@ -35,7 +35,10 @@ import (
 	"unsafe"
 )
 
-var intOne = NewInt(1)
+var (
+	intZero = NewInt(0)
+	intOne  = NewInt(1)
+)
 
 // An Int represents a signed multi-precision integer.
 // The zero value for an Int represents the value 0.
