@@ -106,7 +106,8 @@ func (z *Int) SetInt64(x int64) *Int {
 	return z
 }
 
-func (z *Int) setUint64(x uint64) *Int {
+// SetUint64 sets z to x and returns z.
+func (z *Int) SetUint64(x uint64) *Int {
 	z.doinit()
 	C.mpz_set_ui(&z.i[0], C.ulong(x))
 	return z
@@ -220,13 +221,13 @@ func (z *Int) mulRange(a, b uint64) *Int {
 	switch {
 	case a == 0:
 		// cut long ranges short (optimization)
-		return z.setUint64(0)
+		return z.SetUint64(0)
 	case a > b:
-		return z.setUint64(1)
+		return z.SetUint64(1)
 	case a == b:
-		return z.setUint64(a)
+		return z.SetUint64(a)
 	case a+1 == b:
-		A, B := new(Int).setUint64(a), new(Int).setUint64(b)
+		A, B := new(Int).SetUint64(a), new(Int).SetUint64(b)
 		z.Mul(A, B)
 		A.Clear()
 		B.Clear()
