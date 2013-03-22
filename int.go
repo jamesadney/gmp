@@ -341,11 +341,7 @@ func (z *Int) GCD(x, y, a, b *Int) *Int {
 	z.doinit()
 
 	// Compatibility with math/big
-	if a.Cmp(intZero) == 0 || b.Cmp(intZero) == 0 {
-		z.Set(intZero)
-		return z
-	}
-	if a.Sign() == -1 || b.Sign() == -1 {
+	if a.Cmp(intZero) <= 0 || b.Cmp(intZero) <= 0 {
 		z.Set(intZero)
 		return z
 	}
