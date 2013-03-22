@@ -469,11 +469,22 @@ func (z *Int) Sqrt(x *Int) *Int {
 	return z
 }
 
+// Int64 returns the int64 representation of x. If x cannot be represented
+// in an int64, the result is undefined.
 func (z *Int) Int64() int64 {
 	if !z.init {
 		return 0
 	}
 	return int64(C.mpz_get_si(&z.i[0]))
+}
+
+// Uint64 returns the uint64 representation of x. If x cannot be
+// represented in an uint64, the result is undefined.
+func (z *Int) Uint64() uint64 {
+	if !z.init {
+		return 0
+	}
+	return uint64(C.mpz_get_ui(&z.i[0]))
 }
 
 // Neg sets z = -x and returns z.

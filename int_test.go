@@ -1,6 +1,7 @@
 package gmp
 
 import (
+	"fmt"
 	"testing"
 	"testing/quick"
 )
@@ -573,6 +574,60 @@ func TestSetString(t *testing.T) {
 		}
 		if n2.Cmp(expected) != 0 {
 			t.Errorf("#%d (input '%s') got: %s want: %d", i, test.in, n2, test.val)
+		}
+	}
+}
+
+var int64Tests = []int64{
+	0,
+	1,
+	-1,
+	4294967295,
+	-4294967295,
+	4294967296,
+	-4294967296,
+	9223372036854775807,
+	-9223372036854775807,
+	-9223372036854775808,
+}
+
+func TestInt64(t *testing.T) {
+	for i, testVal := range int64Tests {
+		in := NewInt(testVal)
+		out := in.Int64()
+
+		if out != testVal {
+			t.Errorf("#%d got %d want %d", i, out, testVal)
+		}
+	}
+}
+
+var uint64Tests = []uint64{
+	0,
+	1,
+	4294967295,
+	4294967296,
+	8589934591,
+	8589934592,
+	9223372036854775807,
+	9223372036854775808,
+	18446744073709551615, // 1<<64 - 1
+}
+
+func TestUint64(t *testing.T) {
+	in := new(Int)
+	for i, testVal := range uint64Tests {
+		in.SetUint64(testVal)
+		out := in.Uint64()
+
+		if out != testVal {
+			t.Errorf("#%d got %d want %d", i, out, testVal)
+		}
+
+		str := fmt.Sprint(testVal)
+		strOut := in.String()
+		if strOut != str {
+			t.Errorf("#%d.String got %s want %s", i, strOut, str)
 		}
 	}
 }
