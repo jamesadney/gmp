@@ -223,7 +223,6 @@ func (z *Int) mulRange(a, b uint64) *Int {
 		return z.setUint64(0)
 	case a > b:
 		return z.setUint64(1)
-	//TODO: create SetUint64
 	case a == b:
 		return z.setUint64(a)
 	case a+1 == b:
