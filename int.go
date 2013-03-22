@@ -449,13 +449,7 @@ func (z *Int) Sign() int {
 func (x *Int) Cmp(y *Int) int {
 	x.doinit()
 	y.doinit()
-	switch cmp := C.mpz_cmp(&x.i[0], &y.i[0]); {
-	case cmp < 0:
-		return -1
-	case cmp == 0:
-		return 0
-	}
-	return +1
+	return int(C.mpz_cmp(&x.i[0], &y.i[0]))
 }
 
 /*
