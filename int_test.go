@@ -198,6 +198,79 @@ func TestExp(t *testing.T) {
 	}
 }
 
+func checkGcd(aBytes, bBytes []byte) bool {
+	x := new(Int)
+	y := new(Int)
+	a := new(Int).SetBytes(aBytes)
+	b := new(Int).SetBytes(bBytes)
+
+	d := new(Int).GCD(x, y, a, b)
+	x.Mul(x, a)
+	y.Mul(y, b)
+	x.Add(x, y)
+
+	return x.Cmp(d) == 0
+}
+
+var gcdTests = []struct {
+	d, x, y, a, b string
+}{
+	// a <= 0 || b <= 0
+	{"0", "0", "0", "0", "0"},
+	{"0", "0", "0", "0", "7"},
+	{"0", "0", "0", "11", "0"},
+	{"0", "0", "0", "-77", "35"},
+	{"0", "0", "0", "64515", "-24310"},
+	{"0", "0", "0", "-64515", "-24310"},
+
+	{"1", "-9", "47", "120", "23"},
+	{"7", "1", "-2", "77", "35"},
+	{"935", "-3", "8", "64515", "24310"},
+	{"935000000000000000", "-3", "8", "64515000000000000000", "24310000000000000000"},
+	{"1", "-221", "22059940471369027483332068679400581064239780177629666810348940098015901108344", "98920366548084643601728869055592650835572950932266967461790948584315647051443", "991"},
+
+	// test early exit (after one Euclidean iteration) in binaryGCD
+	{"1", "", "", "1", "98920366548084643601728869055592650835572950932266967461790948584315647051443"},
+}
+
+func testGcd(t *testing.T, d, x, y, a, b *Int) {
+	var X *Int
+	if x != nil {
+		X = new(Int)
+	}
+	var Y *Int
+	if y != nil {
+		Y = new(Int)
+	}
+	D := new(Int).GCD(X, Y, a, b)
+	if D.Cmp(d) != 0 {
+		t.Errorf("GCD(%s, %s): got d = %s, want %s", a, b, D, d)
+	}
+	if x != nil && X.Cmp(x) != 0 {
+		t.Errorf("GCD(%s, %s): got x = %s, want %s", a, b, X, x)
+	}
+	if y != nil && Y.Cmp(y) != 0 {
+		t.Errorf("GCD(%s, %s): got y = %s, want %s", a, b, Y, y)
+	}
+}
+
+func TestGcd(t *testing.T) {
+	for _, test := range gcdTests {
+		d, _ := new(Int).SetString(test.d, 0)
+		x, _ := new(Int).SetString(test.x, 0)
+		y, _ := new(Int).SetString(test.y, 0)
+		a, _ := new(Int).SetString(test.a, 0)
+		b, _ := new(Int).SetString(test.b, 0)
+
+		testGcd(t, d, nil, nil, a, b)
+		testGcd(t, d, x, nil, a, b)
+		testGcd(t, d, nil, y, a, b)
+		testGcd(t, d, x, y, a, b)
+	}
+
+	quick.Check(checkGcd, nil)
+}
+
 var stringTests = []struct {
 	in   string
 	out  string

@@ -333,6 +333,37 @@ func (z *Int) ModInverse(g, p *Int) *Int {
 	return z
 }
 
+// GCD sets z to the greatest common divisor of a and b, which must be positive
+// numbers, and returns z. If x and y are not nil, GCD sets x and y such that
+// z = a*x + b*y. If either a or b is not positive, GCD sets z = x = y = 0.
+func (z *Int) GCD(x, y, a, b *Int) *Int {
+
+	z.doinit()
+
+	// Compatibility with math/big
+	if a.Cmp(intZero) == 0 || b.Cmp(intZero) == 0 {
+		z.Set(intZero)
+		return z
+	}
+	if a.Sign() == -1 || b.Sign() == -1 {
+		z.Set(intZero)
+		return z
+	}
+
+	// allow for nil x and y
+	if x != nil {
+		x.doinit()
+	}
+	if y != nil {
+		y.doinit()
+	}
+
+	a.doinit()
+	b.doinit()
+	C.mpz_gcdext(&z.i[0], &x.i[0], &y.i[0], &a.i[0], &b.i[0])
+	return z
+}
+
 // Lsh sets z = x << s and returns z.
 func (z *Int) Lsh(x *Int, s uint) *Int {
 	x.doinit()
@@ -434,19 +465,6 @@ func (x *Int) Cmp(y *Int) int {
 /*
  * functions without a clear receiver
  */
-
-// GcdInt sets d to the greatest common divisor of a and b,
-// which must be positive numbers.
-// If x and y are not nil, GcdInt sets x and y such that d = a*x + b*y.
-// If either a or b is not positive, GcdInt sets d = x = y = 0.
-func GcdInt(d, x, y, a, b *Int) {
-	d.doinit()
-	x.doinit()
-	y.doinit()
-	a.doinit()
-	b.doinit()
-	C.mpz_gcdext(&d.i[0], &x.i[0], &y.i[0], &a.i[0], &b.i[0])
-}
 
 // ProbablyPrime performs n Miller-Rabin tests to check whether z is prime.
 // If it returns true, z is prime with probability 1 - 1/4^n.
