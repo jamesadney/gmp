@@ -5,6 +5,152 @@ import (
 	"testing/quick"
 )
 
+type funZZ func(z, x, y *Int) *Int
+type argZZ struct {
+	z, x, y *Int
+}
+
+var sumZZ = []argZZ{
+	{NewInt(0), NewInt(0), NewInt(0)},
+	{NewInt(1), NewInt(1), NewInt(0)},
+	{NewInt(1111111110), NewInt(123456789), NewInt(987654321)},
+	{NewInt(-1), NewInt(-1), NewInt(0)},
+	{NewInt(864197532), NewInt(-123456789), NewInt(987654321)},
+	{NewInt(-1111111110), NewInt(-123456789), NewInt(-987654321)},
+}
+
+var prodZZ = []argZZ{
+	{NewInt(0), NewInt(0), NewInt(0)},
+	{NewInt(0), NewInt(1), NewInt(0)},
+	{NewInt(1), NewInt(1), NewInt(1)},
+	{NewInt(-991 * 991), NewInt(991), NewInt(-991)},
+	// TODO(gri) add larger products
+}
+
+func TestSignZ(t *testing.T) {
+	var zero Int
+	for _, a := range sumZZ {
+		s := a.z.Sign()
+		e := a.z.Cmp(&zero)
+		if s != e {
+			t.Errorf("got %d; want %d for z = %v", s, e, a.z)
+		}
+	}
+}
+
+func TestSetZ(t *testing.T) {
+	for _, a := range sumZZ {
+		var z Int
+		z.Set(a.z)
+		if (&z).Cmp(a.z) != 0 {
+			t.Errorf("got z = %v; want %v", z, a.z)
+		}
+	}
+}
+
+func TestAbsZ(t *testing.T) {
+	var zero Int
+	for _, a := range sumZZ {
+		var z Int
+		z.Abs(a.z)
+		var e Int
+		e.Set(a.z)
+		if e.Cmp(&zero) < 0 {
+			e.Sub(&zero, &e)
+		}
+		if z.Cmp(&e) != 0 {
+			t.Errorf("got z = %v; want %v", z, e)
+		}
+	}
+}
+
+func testFunZZ(t *testing.T, msg string, f funZZ, a argZZ) {
+	var z Int
+	f(&z, a.x, a.y)
+	if (&z).Cmp(a.z) != 0 {
+		t.Errorf("%s%+v\n\tgot z = %v; want %v", msg, a, &z, a.z)
+	}
+}
+
+func TestSumZZ(t *testing.T) {
+	AddZZ := func(z, x, y *Int) *Int { return z.Add(x, y) }
+	SubZZ := func(z, x, y *Int) *Int { return z.Sub(x, y) }
+	for _, a := range sumZZ {
+		arg := a
+		testFunZZ(t, "AddZZ", AddZZ, arg)
+
+		arg = argZZ{a.z, a.y, a.x}
+		testFunZZ(t, "AddZZ symmetric", AddZZ, arg)
+
+		arg = argZZ{a.x, a.z, a.y}
+		testFunZZ(t, "SubZZ", SubZZ, arg)
+
+		arg = argZZ{a.y, a.z, a.x}
+		testFunZZ(t, "SubZZ symmetric", SubZZ, arg)
+	}
+}
+
+func TestProdZZ(t *testing.T) {
+	MulZZ := func(z, x, y *Int) *Int { return z.Mul(x, y) }
+	for _, a := range prodZZ {
+		arg := a
+		testFunZZ(t, "MulZZ", MulZZ, arg)
+
+		arg = argZZ{a.z, a.y, a.x}
+		testFunZZ(t, "MulZZ symmetric", MulZZ, arg)
+	}
+}
+
+// mulBytes returns x*y via grade school multiplication. Both inputs
+// and the result are assumed to be in big-endian representation (to
+// match the semantics of Int.Bytes and Int.SetBytes).
+func mulBytes(x, y []byte) []byte {
+	z := make([]byte, len(x)+len(y))
+
+	// multiply
+	k0 := len(z) - 1
+	for j := len(y) - 1; j >= 0; j-- {
+		d := int(y[j])
+		if d != 0 {
+			k := k0
+			carry := 0
+			for i := len(x) - 1; i >= 0; i-- {
+				t := int(z[k]) + int(x[i])*d + carry
+				z[k], carry = byte(t), t>>8
+				k--
+			}
+			z[k] = byte(carry)
+		}
+		k0--
+	}
+
+	// normalize (remove leading 0's)
+	i := 0
+	for i < len(z) && z[i] == 0 {
+		i++
+	}
+
+	return z[i:]
+}
+
+func checkMul(a, b []byte) bool {
+	var x, y, z1 Int
+	x.SetBytes(a)
+	y.SetBytes(b)
+	z1.Mul(&x, &y)
+
+	var z2 Int
+	z2.SetBytes(mulBytes(a, b))
+
+	return z1.Cmp(&z2) == 0
+}
+
+func TestMul(t *testing.T) {
+	if err := quick.Check(checkMul, nil); err != nil {
+		t.Error(err)
+	}
+}
+
 // Examples from the Go Language Spec, section "Arithmetic operators"
 var divisionSignsTests = []struct {
 	x, y int64
