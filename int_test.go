@@ -151,6 +151,71 @@ func TestMul(t *testing.T) {
 	}
 }
 
+var mulRangesN = []struct {
+	a, b uint64
+	prod string
+}{
+	{0, 0, "0"},
+	{1, 1, "1"},
+	{1, 2, "2"},
+	{1, 3, "6"},
+	{10, 10, "10"},
+	{0, 100, "0"},
+	{0, 1e9, "0"},
+	{1, 0, "1"},                    // empty range
+	{100, 1, "1"},                  // empty range
+	{1, 10, "3628800"},             // 10!
+	{1, 20, "2432902008176640000"}, // 20!
+	{1, 100,
+		"933262154439441526816992388562667004907159682643816214685929" +
+			"638952175999932299156089414639761565182862536979208272237582" +
+			"51185210916864000000000000000000000000", // 100!
+	},
+}
+
+var mulRangesZ = []struct {
+	a, b int64
+	prod string
+}{
+	// entirely positive ranges are covered by mulRangesN
+	{-1, 1, "0"},
+	{-2, -1, "2"},
+	{-3, -2, "6"},
+	{-3, -1, "-6"},
+	{1, 3, "6"},
+	{-10, -10, "-10"},
+	{0, -1, "1"},                      // empty range
+	{-1, -100, "1"},                   // empty range
+	{-1, 1, "0"},                      // range includes 0
+	{-1e9, 0, "0"},                    // range includes 0
+	{-1e9, 1e9, "0"},                  // range includes 0
+	{-10, -1, "3628800"},              // 10!
+	{-20, -2, "-2432902008176640000"}, // -20!
+	{-99, -1,
+		"-933262154439441526816992388562667004907159682643816214685929" +
+			"638952175999932299156089414639761565182862536979208272237582" +
+			"511852109168640000000000000000000000", // -99!
+	},
+}
+
+func TestMulRangeZ(t *testing.T) {
+	var tmp Int
+	// test entirely positive ranges
+	for i, r := range mulRangesN {
+		prod := tmp.MulRange(int64(r.a), int64(r.b)).String()
+		if prod != r.prod {
+			t.Errorf("#%da: got %s; want %s", i, prod, r.prod)
+		}
+	}
+	// test other ranges
+	for i, r := range mulRangesZ {
+		prod := tmp.MulRange(r.a, r.b).String()
+		if prod != r.prod {
+			t.Errorf("#%db: got %s; want %s", i, prod, r.prod)
+		}
+	}
+}
+
 // Examples from the Go Language Spec, section "Arithmetic operators"
 var divisionSignsTests = []struct {
 	x, y int64

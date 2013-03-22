@@ -106,6 +106,12 @@ func (z *Int) SetInt64(x int64) *Int {
 	return z
 }
 
+func (z *Int) setUint64(x uint64) *Int {
+	z.doinit()
+	C.mpz_set_ui(&z.i[0], C.ulong(x))
+	return z
+}
+
 // SetString sets z to the value of s, interpreted in the given base,
 // and returns z and a boolean indicating success. If SetString fails, the
 // value of z is undefined but the returned value is nil.
@@ -205,6 +211,63 @@ func (z *Int) Mul(x, y *Int) *Int {
 	y.doinit()
 	z.doinit()
 	C.mpz_mul(&z.i[0], &x.i[0], &y.i[0])
+	return z
+}
+
+// mulRange computes the product of all the unsigned integers in the
+// range [a, b] inclusively. If a > b (empty range), the result is 1.
+func (z *Int) mulRange(a, b uint64) *Int {
+	switch {
+	case a == 0:
+		// cut long ranges short (optimization)
+		return z.setUint64(0)
+	case a > b:
+		return z.setUint64(1)
+	//TODO: create SetUint64
+	case a == b:
+		return z.setUint64(a)
+	case a+1 == b:
+		A, B := new(Int).setUint64(a), new(Int).setUint64(b)
+		z.Mul(A, B)
+		A.Clear()
+		B.Clear()
+		return z
+	}
+	m := (a + b) / 2
+	temp_a := new(Int).mulRange(a, m)
+	temp_b := new(Int).mulRange(m+1, b)
+
+	z.Mul(temp_a, temp_b)
+
+	temp_a.Clear()
+	temp_b.Clear()
+	return z
+}
+
+// MulRange sets z to the product of all integers
+// in the range [a, b] inclusively and returns z.
+// If a > b (empty range), the result is 1.
+func (z *Int) MulRange(a, b int64) *Int {
+	switch {
+	case a > b:
+		return z.SetInt64(1) // empty range
+	case a <= 0 && b >= 0:
+		return z.SetInt64(0) // range includes 0
+	}
+	// a <= b && (b < 0 || a > 0)
+
+	neg := false
+	if a < 0 {
+		neg = (b-a)&1 == 0
+		a, b = -b, -a
+	}
+
+	z = z.mulRange(uint64(a), uint64(b))
+	if neg {
+		negativeOne := NewInt(-1)
+		z.Mul(z, negativeOne)
+		negativeOne.Clear()
+	}
 	return z
 }
 
