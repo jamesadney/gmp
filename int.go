@@ -72,6 +72,16 @@ func (z *Int) Bytes() []byte {
 	return b[0:n]
 }
 
+// BitLen returns the length of the absolute value of z in bits.
+// The bit length of 0 is 0.
+func (x *Int) BitLen() int {
+	x.doinit()
+	if x.Cmp(intZero) == 0 {
+		return 0
+	}
+	return x.Len()
+}
+
 // Len returns the length of z in bits.  0 is considered to have length 1.
 func (z *Int) Len() int {
 	z.doinit()

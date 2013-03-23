@@ -377,6 +377,38 @@ func TestQuo(t *testing.T) {
 // 	}
 // }
 
+var bitLenTests = []struct {
+	in  string
+	out int
+}{
+	{"-1", 1},
+	{"0", 0},
+	{"1", 1},
+	{"2", 2},
+	{"4", 3},
+	{"0xabc", 12},
+	{"0x8000", 16},
+	{"0x80000000", 32},
+	{"0x800000000000", 48},
+	{"0x8000000000000000", 64},
+	{"0x80000000000000000000", 80},
+	{"-0x4000000000000000000000", 87},
+}
+
+func TestBitLen(t *testing.T) {
+	for i, test := range bitLenTests {
+		x, ok := new(Int).SetString(test.in, 0)
+		if !ok {
+			t.Errorf("#%d test input invalid: %s", i, test.in)
+			continue
+		}
+
+		if n := x.BitLen(); n != test.out {
+			t.Errorf("#%d got %d want %d", i, n, test.out)
+		}
+	}
+}
+
 var expTests = []struct {
 	x, y, m string
 	out     string
