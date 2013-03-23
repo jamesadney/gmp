@@ -877,6 +877,265 @@ func TestUint64(t *testing.T) {
 	}
 }
 
+var bitwiseTests = []struct {
+	x, y                 string
+	and, or, xor, andNot string
+}{
+	{"0x00", "0x00", "0x00", "0x00", "0x00", "0x00"},
+	{"0x00", "0x01", "0x00", "0x01", "0x01", "0x00"},
+	{"0x01", "0x00", "0x00", "0x01", "0x01", "0x01"},
+	{"-0x01", "0x00", "0x00", "-0x01", "-0x01", "-0x01"},
+	{"-0xaf", "-0x50", "-0xf0", "-0x0f", "0xe1", "0x41"},
+	{"0x00", "-0x01", "0x00", "-0x01", "-0x01", "0x00"},
+	{"0x01", "0x01", "0x01", "0x01", "0x00", "0x00"},
+	{"-0x01", "-0x01", "-0x01", "-0x01", "0x00", "0x00"},
+	{"0x07", "0x08", "0x00", "0x0f", "0x0f", "0x07"},
+	{"0x05", "0x0f", "0x05", "0x0f", "0x0a", "0x00"},
+	{"0x013ff6", "0x9a4e", "0x1a46", "0x01bffe", "0x01a5b8", "0x0125b0"},
+	{"-0x013ff6", "0x9a4e", "0x800a", "-0x0125b2", "-0x01a5bc", "-0x01c000"},
+	{"-0x013ff6", "-0x9a4e", "-0x01bffe", "-0x1a46", "0x01a5b8", "0x8008"},
+	{
+		"0x1000009dc6e3d9822cba04129bcbe3401",
+		"0xb9bd7d543685789d57cb918e833af352559021483cdb05cc21fd",
+		"0x1000001186210100001000009048c2001",
+		"0xb9bd7d543685789d57cb918e8bfeff7fddb2ebe87dfbbdfe35fd",
+		"0xb9bd7d543685789d57ca918e8ae69d6fcdb2eae87df2b97215fc",
+		"0x8c40c2d8822caa04120b8321400",
+	},
+	{
+		"0x1000009dc6e3d9822cba04129bcbe3401",
+		"-0xb9bd7d543685789d57cb918e833af352559021483cdb05cc21fd",
+		"0x8c40c2d8822caa04120b8321401",
+		"-0xb9bd7d543685789d57ca918e82229142459020483cd2014001fd",
+		"-0xb9bd7d543685789d57ca918e8ae69d6fcdb2eae87df2b97215fe",
+		"0x1000001186210100001000009048c2000",
+	},
+	{
+		"-0x1000009dc6e3d9822cba04129bcbe3401",
+		"-0xb9bd7d543685789d57cb918e833af352559021483cdb05cc21fd",
+		"-0xb9bd7d543685789d57cb918e8bfeff7fddb2ebe87dfbbdfe35fd",
+		"-0x1000001186210100001000009048c2001",
+		"0xb9bd7d543685789d57ca918e8ae69d6fcdb2eae87df2b97215fc",
+		"0xb9bd7d543685789d57ca918e82229142459020483cd2014001fc",
+	},
+}
+
+type bitFun func(z, x, y *Int) *Int
+
+func testBitFun(t *testing.T, msg string, f bitFun, x, y *Int, exp string) {
+	expected := new(Int)
+	expected.SetString(exp, 0)
+
+	out := f(new(Int), x, y)
+	if out.Cmp(expected) != 0 {
+		t.Errorf("%s: got %s want %s", msg, out, expected)
+	}
+}
+
+func testBitFunSelf(t *testing.T, msg string, f bitFun, x, y *Int, exp string) {
+	self := new(Int)
+	self.Set(x)
+	expected := new(Int)
+	expected.SetString(exp, 0)
+
+	self = f(self, self, y)
+	if self.Cmp(expected) != 0 {
+		t.Errorf("%s: got %s want %s", msg, self, expected)
+	}
+}
+
+func altBit(x *Int, i int) uint {
+	z := new(Int).Rsh(x, uint(i))
+	z = z.And(z, NewInt(1))
+	if z.Cmp(new(Int)) != 0 {
+		return 1
+	}
+	return 0
+}
+
+func altSetBit(z *Int, x *Int, i int, b uint) *Int {
+	one := NewInt(1)
+	m := one.Lsh(one, uint(i))
+	switch b {
+	case 1:
+		return z.Or(x, m)
+	case 0:
+		return z.AndNot(x, m)
+	}
+	panic("set bit is not 0 or 1")
+}
+
+func testBitset(t *testing.T, x *Int) {
+	n := x.BitLen()
+	z := new(Int).Set(x)
+	z1 := new(Int).Set(x)
+	for i := 0; i < n+10; i++ {
+		old := z.Bit(i)
+		old1 := altBit(z1, i)
+		if old != old1 {
+			t.Errorf("bitset: inconsistent value for Bit(%s, %d), got %v want %v", z1, i, old, old1)
+		}
+		z := new(Int).SetBit(z, i, 1)
+		z1 := altSetBit(new(Int), z1, i, 1)
+		if z.Bit(i) == 0 {
+			t.Errorf("bitset: bit %d of %s got 0 want 1", i, x)
+		}
+		if z.Cmp(z1) != 0 {
+			t.Errorf("bitset: inconsistent value after SetBit 1, got %s want %s", z, z1)
+		}
+		z.SetBit(z, i, 0)
+		altSetBit(z1, z1, i, 0)
+		if z.Bit(i) != 0 {
+			t.Errorf("bitset: bit %d of %s got 1 want 0", i, x)
+		}
+		if z.Cmp(z1) != 0 {
+			t.Errorf("bitset: inconsistent value after SetBit 0, got %s want %s", z, z1)
+		}
+		altSetBit(z1, z1, i, old)
+		z.SetBit(z, i, old)
+		if z.Cmp(z1) != 0 {
+			t.Errorf("bitset: inconsistent value after SetBit old, got %s want %s", z, z1)
+		}
+	}
+	if z.Cmp(x) != 0 {
+		t.Errorf("bitset: got %s want %s", z, x)
+	}
+}
+
+var bitsetTests = []struct {
+	x string
+	i int
+	b uint
+}{
+	{"0", 0, 0},
+	{"0", 200, 0},
+	{"1", 0, 1},
+	{"1", 1, 0},
+	{"-1", 0, 1},
+	{"-1", 200, 1},
+	{"0x2000000000000000000000000000", 108, 0},
+	{"0x2000000000000000000000000000", 109, 1},
+	{"0x2000000000000000000000000000", 110, 0},
+	{"-0x2000000000000000000000000001", 108, 1},
+	{"-0x2000000000000000000000000001", 109, 0},
+	{"-0x2000000000000000000000000001", 110, 1},
+}
+
+func TestBitSet(t *testing.T) {
+	for _, test := range bitwiseTests {
+		x := new(Int)
+		x.SetString(test.x, 0)
+		testBitset(t, x)
+		x = new(Int)
+		x.SetString(test.y, 0)
+		testBitset(t, x)
+	}
+	for i, test := range bitsetTests {
+		x := new(Int)
+		x.SetString(test.x, 0)
+		b := x.Bit(test.i)
+		if b != test.b {
+			t.Errorf("#%d got %v want %v", i, b, test.b)
+		}
+	}
+	z := NewInt(1)
+	z.SetBit(NewInt(0), 2, 1)
+	if z.Cmp(NewInt(4)) != 0 {
+		t.Errorf("destination leaked into result; got %s want 4", z)
+	}
+}
+
+func BenchmarkBitset(b *testing.B) {
+	z := new(Int)
+	z.SetBit(z, 512, 1)
+	b.ResetTimer()
+	b.StartTimer()
+	for i := b.N - 1; i >= 0; i-- {
+		z.SetBit(z, i&512, 1)
+	}
+}
+
+func BenchmarkBitsetNeg(b *testing.B) {
+	z := NewInt(-1)
+	z.SetBit(z, 512, 0)
+	b.ResetTimer()
+	b.StartTimer()
+	for i := b.N - 1; i >= 0; i-- {
+		z.SetBit(z, i&512, 0)
+	}
+}
+
+func BenchmarkBitsetOrig(b *testing.B) {
+	z := new(Int)
+	altSetBit(z, z, 512, 1)
+	b.ResetTimer()
+	b.StartTimer()
+	for i := b.N - 1; i >= 0; i-- {
+		altSetBit(z, z, i&512, 1)
+	}
+}
+
+func BenchmarkBitsetNegOrig(b *testing.B) {
+	z := NewInt(-1)
+	altSetBit(z, z, 512, 0)
+	b.ResetTimer()
+	b.StartTimer()
+	for i := b.N - 1; i >= 0; i-- {
+		altSetBit(z, z, i&512, 0)
+	}
+}
+
+func TestBitwise(t *testing.T) {
+	x := new(Int)
+	y := new(Int)
+	for _, test := range bitwiseTests {
+		x.SetString(test.x, 0)
+		y.SetString(test.y, 0)
+
+		testBitFun(t, "and", (*Int).And, x, y, test.and)
+		testBitFunSelf(t, "and", (*Int).And, x, y, test.and)
+		testBitFun(t, "andNot", (*Int).AndNot, x, y, test.andNot)
+		testBitFunSelf(t, "andNot", (*Int).AndNot, x, y, test.andNot)
+		testBitFun(t, "or", (*Int).Or, x, y, test.or)
+		testBitFunSelf(t, "or", (*Int).Or, x, y, test.or)
+		testBitFun(t, "xor", (*Int).Xor, x, y, test.xor)
+		testBitFunSelf(t, "xor", (*Int).Xor, x, y, test.xor)
+	}
+}
+
+var notTests = []struct {
+	in  string
+	out string
+}{
+	{"0", "-1"},
+	{"1", "-2"},
+	{"7", "-8"},
+	{"0", "-1"},
+	{"-81910", "81909"},
+	{
+		"298472983472983471903246121093472394872319615612417471234712061",
+		"-298472983472983471903246121093472394872319615612417471234712062",
+	},
+}
+
+func TestNot(t *testing.T) {
+	in := new(Int)
+	out := new(Int)
+	expected := new(Int)
+	for i, test := range notTests {
+		in.SetString(test.in, 10)
+		expected.SetString(test.out, 10)
+		out = out.Not(in)
+		if out.Cmp(expected) != 0 {
+			t.Errorf("#%d: got %s want %s", i, out, expected)
+		}
+		out = out.Not(out)
+		if out.Cmp(in) != 0 {
+			t.Errorf("#%d: got %s want %s", i, out, in)
+		}
+	}
+}
+
 var modInverseTests = []struct {
 	element string
 	prime   string

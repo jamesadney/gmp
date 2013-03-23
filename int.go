@@ -449,6 +449,82 @@ func (z *Int) Rsh(x *Int, s uint) *Int {
 	return z
 }
 
+// Bit returns the value of the i'th bit of x. That is, it
+// returns (x>>i)&1. The bit index i must be >= 0.
+func (x *Int) Bit(i int) uint {
+	x.doinit()
+	return uint(C.mpz_tstbit(&x.i[0], C.mp_bitcnt_t(i)))
+}
+
+// SetBit sets z to x, with x's i'th bit set to b (0 or 1).
+// That is, if bit is 1 SetBit sets z = x | (1 << i);
+// if bit is 0 it sets z = x &^ (1 << i). If bit is not 0 or 1,
+// SetBit will panic.
+func (z *Int) SetBit(x *Int, i int, b uint) *Int {
+	z.doinit()
+
+	if i < 0 {
+		panic("negative bit index")
+	}
+
+	z.Set(x)
+	switch b {
+	case 0:
+		C.mpz_clrbit(&z.i[0], C.mp_bitcnt_t(i))
+	case 1:
+		C.mpz_setbit(&z.i[0], C.mp_bitcnt_t(i))
+	default:
+		panic("set bit is not 0 or 1")
+	}
+	return z
+}
+
+// And sets z = x & y and returns z.
+func (z *Int) And(x, y *Int) *Int {
+	z.doinit()
+	x.doinit()
+	y.doinit()
+	C.mpz_and(&z.i[0], &x.i[0], &y.i[0])
+	return z
+}
+
+// AndNot sets z = x &^ y and returns z.
+func (z *Int) AndNot(x, y *Int) *Int {
+	z.doinit()
+	x.doinit()
+	y.doinit()
+
+	temp := new(Int).Not(y)
+	defer temp.Clear()
+	return z.And(x, temp)
+}
+
+// Or sets z = x | y and returns z.
+func (z *Int) Or(x, y *Int) *Int {
+	z.doinit()
+	x.doinit()
+	y.doinit()
+	C.mpz_ior(&z.i[0], &x.i[0], &y.i[0])
+	return z
+}
+
+// Xor sets z = x ^ y and returns z.
+func (z *Int) Xor(x, y *Int) *Int {
+	z.doinit()
+	x.doinit()
+	y.doinit()
+	C.mpz_xor(&z.i[0], &x.i[0], &y.i[0])
+	return z
+}
+
+// Not sets z = ^x and returns z.
+func (z *Int) Not(x *Int) *Int {
+	z.doinit()
+	x.doinit()
+	C.mpz_com(&z.i[0], &x.i[0])
+	return z
+}
+
 // Exp sets z = x^y % m and returns z. If m != nil, negative exponents are
 // allowed if x^-1 mod m exists. If the inverse doesn't exist then a
 // division-by-zero run-time panic occurs.
