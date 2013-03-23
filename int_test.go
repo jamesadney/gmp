@@ -1,6 +1,8 @@
 package gmp
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"testing"
 	"testing/quick"
@@ -261,6 +263,38 @@ func TestDivisionSigns(t *testing.T) {
 		if d2.Cmp(d) != 0 || m2.Cmp(m) != 0 {
 			t.Errorf("#%d DivMod: got (%s, %s), want (%s, %s)", i, d2, m2, d, m)
 		}
+	}
+}
+
+func checkSetBytes(b []byte) bool {
+	hex1 := hex.EncodeToString(new(Int).SetBytes(b).Bytes())
+	hex2 := hex.EncodeToString(b)
+
+	for len(hex1) < len(hex2) {
+		hex1 = "0" + hex1
+	}
+
+	for len(hex1) > len(hex2) {
+		hex2 = "0" + hex2
+	}
+
+	return hex1 == hex2
+}
+
+func TestSetBytes(t *testing.T) {
+	if err := quick.Check(checkSetBytes, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func checkBytes(b []byte) bool {
+	b2 := new(Int).SetBytes(b).Bytes()
+	return bytes.Equal(b, b2)
+}
+
+func TestBytes(t *testing.T) {
+	if err := quick.Check(checkSetBytes, nil); err != nil {
+		t.Error(err)
 	}
 }
 
