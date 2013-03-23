@@ -1,3 +1,7 @@
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package gmp
 
 import (
@@ -215,6 +219,101 @@ func TestMulRangeZ(t *testing.T) {
 		prod := tmp.MulRange(r.a, r.b).String()
 		if prod != r.prod {
 			t.Errorf("#%db: got %s; want %s", i, prod, r.prod)
+		}
+	}
+}
+
+var stringTests = []struct {
+	in   string
+	out  string
+	base int
+	val  int64
+	ok   bool
+}{
+	{in: "", ok: false},
+	{in: "a", ok: false},
+	{in: "z", ok: false},
+	{in: "+", ok: false},
+	{in: "-", ok: false},
+	{in: "0b", ok: false},
+	{in: "0x", ok: false},
+	{in: "2", base: 2, ok: false},
+	{in: "0b2", base: 0, ok: false},
+	{in: "08", ok: false},
+	{in: "8", base: 8, ok: false},
+	{in: "0xg", base: 0, ok: false},
+	{in: "g", base: 16, ok: false},
+	{"0", "0", 0, 0, true},
+	{"0", "0", 10, 0, true},
+	{"0", "0", 16, 0, true},
+	{"+0", "0", 0, 0, true},
+	{"-0", "0", 0, 0, true},
+	{"10", "10", 0, 10, true},
+	{"10", "10", 10, 10, true},
+	{"10", "10", 16, 16, true},
+	{"-10", "-10", 16, -16, true},
+	{"+10", "10", 16, 16, true},
+	{"0x10", "16", 0, 16, true},
+	{in: "0x10", base: 16, ok: false},
+	{"-0x10", "-16", 0, -16, true},
+	{"+0x10", "16", 0, 16, true},
+	{"00", "0", 0, 0, true},
+	{"0", "0", 8, 0, true},
+	{"07", "7", 0, 7, true},
+	{"7", "7", 8, 7, true},
+	{"023", "19", 0, 19, true},
+	{"23", "23", 8, 19, true},
+	{"cafebabe", "cafebabe", 16, 0xcafebabe, true},
+	{"0b0", "0", 0, 0, true},
+	{"-111", "-111", 2, -7, true},
+	{"-0b111", "-7", 0, -7, true},
+	{"0b1001010111", "599", 0, 0x257, true},
+	{"1001010111", "1001010111", 2, 0x257, true},
+}
+
+func format(base int) string {
+	switch base {
+	case 2:
+		return "%b"
+	case 8:
+		return "%o"
+	case 16:
+		return "%x"
+	}
+	return "%d"
+}
+
+func TestSetString(t *testing.T) {
+	tmp := new(Int)
+	for i, test := range stringTests {
+		// initialize to a non-zero value so that issues with parsing
+		// 0 are detected
+		tmp.SetInt64(1234567890)
+		n1, ok1 := new(Int).SetString(test.in, test.base)
+		n2, ok2 := tmp.SetString(test.in, test.base)
+		expected := NewInt(test.val)
+		if ok1 != test.ok || ok2 != test.ok {
+			t.Errorf("#%d (input '%s') ok incorrect (should be %t)", i, test.in, test.ok)
+			continue
+		}
+		if !ok1 {
+			if n1 != nil {
+				t.Errorf("#%d (input '%s') n1 != nil", i, test.in)
+			}
+			continue
+		}
+		if !ok2 {
+			if n2 != nil {
+				t.Errorf("#%d (input '%s') n2 != nil", i, test.in)
+			}
+			continue
+		}
+
+		if n1.Cmp(expected) != 0 {
+			t.Errorf("#%d (input '%s') got: %s want: %d", i, test.in, n1, test.val)
+		}
+		if n2.Cmp(expected) != 0 {
+			t.Errorf("#%d (input '%s') got: %s want: %d", i, test.in, n2, test.val)
 		}
 	}
 }
@@ -520,6 +619,7 @@ func testGcd(t *testing.T, d, x, y, a, b *Int) {
 	if y != nil {
 		Y = new(Int)
 	}
+
 	D := new(Int).GCD(X, Y, a, b)
 	if D.Cmp(d) != 0 {
 		t.Errorf("GCD(%s, %s): got d = %s, want %s", a, b, D, d)
@@ -547,101 +647,6 @@ func TestGcd(t *testing.T) {
 	}
 
 	quick.Check(checkGcd, nil)
-}
-
-var stringTests = []struct {
-	in   string
-	out  string
-	base int
-	val  int64
-	ok   bool
-}{
-	{in: "", ok: false},
-	{in: "a", ok: false},
-	{in: "z", ok: false},
-	{in: "+", ok: false},
-	{in: "-", ok: false},
-	{in: "0b", ok: false},
-	{in: "0x", ok: false},
-	{in: "2", base: 2, ok: false},
-	{in: "0b2", base: 0, ok: false},
-	{in: "08", ok: false},
-	{in: "8", base: 8, ok: false},
-	{in: "0xg", base: 0, ok: false},
-	{in: "g", base: 16, ok: false},
-	{"0", "0", 0, 0, true},
-	{"0", "0", 10, 0, true},
-	{"0", "0", 16, 0, true},
-	{"+0", "0", 0, 0, true},
-	{"-0", "0", 0, 0, true},
-	{"10", "10", 0, 10, true},
-	{"10", "10", 10, 10, true},
-	{"10", "10", 16, 16, true},
-	{"-10", "-10", 16, -16, true},
-	{"+10", "10", 16, 16, true},
-	{"0x10", "16", 0, 16, true},
-	{in: "0x10", base: 16, ok: false},
-	{"-0x10", "-16", 0, -16, true},
-	{"+0x10", "16", 0, 16, true},
-	{"00", "0", 0, 0, true},
-	{"0", "0", 8, 0, true},
-	{"07", "7", 0, 7, true},
-	{"7", "7", 8, 7, true},
-	{"023", "19", 0, 19, true},
-	{"23", "23", 8, 19, true},
-	{"cafebabe", "cafebabe", 16, 0xcafebabe, true},
-	{"0b0", "0", 0, 0, true},
-	{"-111", "-111", 2, -7, true},
-	{"-0b111", "-7", 0, -7, true},
-	{"0b1001010111", "599", 0, 0x257, true},
-	{"1001010111", "1001010111", 2, 0x257, true},
-}
-
-func format(base int) string {
-	switch base {
-	case 2:
-		return "%b"
-	case 8:
-		return "%o"
-	case 16:
-		return "%x"
-	}
-	return "%d"
-}
-
-func TestSetString(t *testing.T) {
-	tmp := new(Int)
-	for i, test := range stringTests {
-		// initialize to a non-zero value so that issues with parsing
-		// 0 are detected
-		tmp.SetInt64(1234567890)
-		n1, ok1 := new(Int).SetString(test.in, test.base)
-		n2, ok2 := tmp.SetString(test.in, test.base)
-		expected := NewInt(test.val)
-		if ok1 != test.ok || ok2 != test.ok {
-			t.Errorf("#%d (input '%s') ok incorrect (should be %t)", i, test.in, test.ok)
-			continue
-		}
-		if !ok1 {
-			if n1 != nil {
-				t.Errorf("#%d (input '%s') n1 != nil", i, test.in)
-			}
-			continue
-		}
-		if !ok2 {
-			if n2 != nil {
-				t.Errorf("#%d (input '%s') n2 != nil", i, test.in)
-			}
-			continue
-		}
-
-		if n1.Cmp(expected) != 0 {
-			t.Errorf("#%d (input '%s') got: %s want: %d", i, test.in, n1, test.val)
-		}
-		if n2.Cmp(expected) != 0 {
-			t.Errorf("#%d (input '%s') got: %s want: %d", i, test.in, n2, test.val)
-		}
-	}
 }
 
 var primes = []string{
