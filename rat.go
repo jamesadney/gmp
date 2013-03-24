@@ -82,6 +82,7 @@ func (q *Rat) SetFrac64(x int64, y int64) *Rat {
 
 // SetInt64 sets z to x and returns z.
 func (z *Rat) SetInt64(x int64) *Rat {
+	z.doinit()
 	z.SetFrac64(x, 1)
 	return z
 }
@@ -90,6 +91,7 @@ func (z *Rat) SetInt64(x int64) *Rat {
 func (q *Rat) SetUint(x, y uint) *Rat {
 	q.doinit()
 	C.mpq_set_ui(&q.i[0], C.ulong(x), C.ulong(y))
+	C.mpq_canonicalize(&q.i[0])
 	return q
 }
 
@@ -123,6 +125,7 @@ func (q *Rat) SetStringBase(s string, base int) (*Rat, bool) {
 // optionally followed by an exponent. If the operation failed, the value of
 // z is undefined but the returned value is nil.
 func (q *Rat) SetString(s string) (*Rat, bool) {
+	q.doinit()
 	return q.SetStringBase(s, 10)
 }
 
@@ -150,6 +153,7 @@ func (q *Rat) StringBase(base int) (string, error) {
 // RatString returns a string representation of z in the form "a/b" if b != 1,
 // and in the form "a" if b == 1.
 func (q *Rat) RatString() string {
+	q.doinit()
 	s, _ := q.StringBase(10)
 	return s
 }
@@ -157,6 +161,7 @@ func (q *Rat) RatString() string {
 // String returns a string representation of z in the form "a/b"
 // (even if b == 1).
 func (q *Rat) String() string {
+	q.doinit()
 	s := q.RatString()
 	if len(s) < 3 { // s not in the form a/b
 		s = s + "/1"
