@@ -252,10 +252,17 @@ func (q *Rat) Div2Exp(x *Rat, s uint) *Rat {
 	return q
 }
 
-func CmpRat(x, y *Rat) int {
+func (x *Rat) Cmp(y *Rat) int {
 	x.doinit()
 	y.doinit()
-	return int(C.mpq_cmp(&x.i[0], &y.i[0]))
+
+	switch cmp := int(C.mpq_cmp(&x.i[0], &y.i[0])); {
+	case cmp < 0:
+		return -1
+	case cmp == 0:
+		return 0
+	}
+	return 1
 }
 
 func CmpRatUint(q *Rat, x, y uint) int {

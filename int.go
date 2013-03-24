@@ -617,7 +617,13 @@ func (z *Int) Sign() int {
 func (x *Int) Cmp(y *Int) int {
 	x.doinit()
 	y.doinit()
-	return int(C.mpz_cmp(x.ptr, y.ptr))
+	switch cmp := int(C.mpz_cmp(x.ptr, y.ptr)); {
+	case cmp < 0:
+		return -1
+	case cmp == 0:
+		return 0
+	}
+	return 1
 }
 
 /*

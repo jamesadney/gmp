@@ -55,6 +55,33 @@ func TestRatSetString(t *testing.T) {
 	}
 }
 
+var ratCmpTests = []struct {
+	rat1, rat2 string
+	out        int
+}{
+	{"0", "0/1", 0},
+	{"1/1", "1", 0},
+	{"-1", "-2/2", 0},
+	{"1", "0", 1},
+	{"0/1", "1/1", -1},
+	{"-5/1434770811533343057144", "-5/1434770811533343057145", -1},
+	{"49832350382626108453/8964749413", "49832350382626108454/8964749413", -1},
+	{"-37414950961700930/7204075375675961", "37414950961700930/7204075375675961", -1},
+	{"37414950961700930/7204075375675961", "74829901923401860/14408150751351922", 0},
+}
+
+func TestRatCmp(t *testing.T) {
+	for i, test := range ratCmpTests {
+		x, _ := new(Rat).SetString(test.rat1)
+		y, _ := new(Rat).SetString(test.rat2)
+
+		out := x.Cmp(y)
+		if out != test.out {
+			t.Errorf("#%d got out = %v; want %v", i, out, test.out)
+		}
+	}
+}
+
 var getStringTests = []struct {
 	in, out string
 	ok      bool
