@@ -43,7 +43,8 @@ var (
 // An Int represents a signed multi-precision integer.
 // The zero value for an Int represents the value 0.
 type Int struct {
-	i    C.mpz_t
+	ptr  C.mpz_ptr // pointer to underlying mpz so Int can be a reference
+	t    C.mpz_t   // mpz_t that needs to be initialized
 	init bool
 }
 
@@ -53,22 +54,26 @@ func NewInt(x int64) *Int { return new(Int).SetInt64(x) }
 // Int promises that the zero value is a 0, but in gmp
 // the zero value is a crash.  To bridge the gap, the
 // init bool says whether this is a valid gmp value.
-// doinit initializes z.i if it needs it.  This is not inherent
+// doinit initializes z.t if it needs it.  This is not inherent
 // to FFI, just a mismatch between Go's convention of
 // making zero values useful and gmp's decision not to.
+//
+// Make z a reference to another mpz_t (not z.t) by directly assigning
+// z.ptr and leaving z.t uninitialized. See Rat.Denom() for an example.
 func (z *Int) doinit() {
 	if z.init {
 		return
 	}
 	z.init = true
-	C.mpz_init(&z.i[0])
+	z.ptr = &z.t[0]
+	C.mpz_init(z.ptr)
 }
 
 // Bytes returns z's representation as a big-endian byte array.
 func (z *Int) Bytes() []byte {
 	b := make([]byte, (z.Len()+7)/8)
 	n := C.size_t(len(b))
-	C.mpz_export(unsafe.Pointer(&b[0]), &n, 1, 1, 1, 0, &z.i[0])
+	C.mpz_export(unsafe.Pointer(&b[0]), &n, 1, 1, 1, 0, z.ptr)
 	return b[0:n]
 }
 
@@ -85,13 +90,13 @@ func (x *Int) BitLen() int {
 // Len returns the length of z in bits.  0 is considered to have length 1.
 func (z *Int) Len() int {
 	z.doinit()
-	return int(C.mpz_sizeinbase(&z.i[0], 2))
+	return int(C.mpz_sizeinbase(z.ptr, 2))
 }
 
 // Set sets z = x and returns z.
 func (z *Int) Set(x *Int) *Int {
 	z.doinit()
-	C.mpz_set(&z.i[0], &x.i[0])
+	C.mpz_set(z.ptr, x.ptr)
 	return z
 }
 
@@ -102,7 +107,7 @@ func (z *Int) SetBytes(b []byte) *Int {
 	if len(b) == 0 {
 		z.SetInt64(0)
 	} else {
-		C.mpz_import(&z.i[0], C.size_t(len(b)), 1, 1, 1, 0,
+		C.mpz_import(z.ptr, C.size_t(len(b)), 1, 1, 1, 0,
 			unsafe.Pointer(&b[0]))
 	}
 	return z
@@ -112,14 +117,14 @@ func (z *Int) SetBytes(b []byte) *Int {
 func (z *Int) SetInt64(x int64) *Int {
 	z.doinit()
 	// TODO(rsc): more work on 32-bit platforms
-	C.mpz_set_si(&z.i[0], C.long(x))
+	C.mpz_set_si(z.ptr, C.long(x))
 	return z
 }
 
 // SetUint64 sets z to x and returns z.
 func (z *Int) SetUint64(x uint64) *Int {
 	z.doinit()
-	C.mpz_set_ui(&z.i[0], C.ulong(x))
+	C.mpz_set_ui(z.ptr, C.ulong(x))
 	return z
 }
 
@@ -157,7 +162,7 @@ func (z *Int) SetString(s string, base int) (*Int, bool) {
 
 	p := C.CString(s)
 	defer C.free(unsafe.Pointer(p))
-	if C.mpz_set_str(&z.i[0], p, C.int(base)) < 0 {
+	if C.mpz_set_str(z.ptr, p, C.int(base)) < 0 {
 		return nil, false
 	}
 	return z, true
@@ -177,7 +182,7 @@ func (z *Int) StringBase(base int) (string, error) {
 		return "", os.ErrInvalid
 	}
 	z.doinit()
-	p := C.mpz_get_str(nil, C.int(base), &z.i[0])
+	p := C.mpz_get_str(nil, C.int(base), z.ptr)
 	s := C.GoString(p)
 	C.free(unsafe.Pointer(p))
 	return s, nil
@@ -185,7 +190,7 @@ func (z *Int) StringBase(base int) (string, error) {
 
 func (z *Int) destroy() {
 	if z.init {
-		C.mpz_clear(&z.i[0])
+		C.mpz_clear(z.ptr)
 	}
 	z.init = false
 }
@@ -203,7 +208,7 @@ func (z *Int) Add(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_add(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_add(z.ptr, x.ptr, y.ptr)
 	return z
 }
 
@@ -212,7 +217,7 @@ func (z *Int) Sub(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_sub(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_sub(z.ptr, x.ptr, y.ptr)
 	return z
 }
 
@@ -221,7 +226,7 @@ func (z *Int) Mul(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_mul(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_mul(z.ptr, x.ptr, y.ptr)
 	return z
 }
 
@@ -288,7 +293,7 @@ func (z *Int) Quo(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_tdiv_q(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_tdiv_q(z.ptr, x.ptr, y.ptr)
 	return z
 }
 
@@ -299,7 +304,7 @@ func (z *Int) Rem(x, y *Int) *Int {
 	x.doinit()
 	y.doinit()
 	z.doinit()
-	C.mpz_tdiv_r(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_tdiv_r(z.ptr, x.ptr, y.ptr)
 	return z
 }
 
@@ -320,7 +325,7 @@ func (z *Int) QuoRem(x, y, r *Int) (*Int, *Int) {
 	y.doinit()
 	r.doinit()
 	z.doinit()
-	C.mpz_tdiv_qr(&z.i[0], &r.i[0], &x.i[0], &y.i[0])
+	C.mpz_tdiv_qr(z.ptr, r.ptr, x.ptr, y.ptr)
 	return z, r
 }
 
@@ -402,7 +407,7 @@ func (z *Int) ModInverse(g, p *Int) *Int {
 	g.doinit()
 	p.doinit()
 	z.doinit()
-	C.mpz_invert(&z.i[0], &g.i[0], &p.i[0])
+	C.mpz_invert(z.ptr, g.ptr, p.ptr)
 	return z
 }
 
@@ -410,7 +415,6 @@ func (z *Int) ModInverse(g, p *Int) *Int {
 // numbers, and returns z. If x and y are not nil, GCD sets x and y such that
 // z = a*x + b*y. If either a or b is not positive, GCD sets z = x = y = 0.
 func (z *Int) GCD(x, y, a, b *Int) *Int {
-
 	z.doinit()
 
 	// Compatibility with math/big
@@ -420,16 +424,20 @@ func (z *Int) GCD(x, y, a, b *Int) *Int {
 	}
 
 	// allow for nil x and y
+	var x_ptr C.mpz_ptr = nil
 	if x != nil {
 		x.doinit()
+		x_ptr = x.ptr
 	}
+	var y_ptr C.mpz_ptr = nil
 	if y != nil {
 		y.doinit()
+		y_ptr = y.ptr
 	}
 
 	a.doinit()
 	b.doinit()
-	C.mpz_gcdext(&z.i[0], &x.i[0], &y.i[0], &a.i[0], &b.i[0])
+	C.mpz_gcdext(z.ptr, x_ptr, y_ptr, a.ptr, b.ptr)
 	return z
 }
 
@@ -437,7 +445,7 @@ func (z *Int) GCD(x, y, a, b *Int) *Int {
 func (z *Int) Lsh(x *Int, s uint) *Int {
 	x.doinit()
 	z.doinit()
-	C._mpz_mul_2exp(&z.i[0], &x.i[0], C.ulong(s))
+	C._mpz_mul_2exp(z.ptr, x.ptr, C.ulong(s))
 	return z
 }
 
@@ -445,7 +453,7 @@ func (z *Int) Lsh(x *Int, s uint) *Int {
 func (z *Int) Rsh(x *Int, s uint) *Int {
 	x.doinit()
 	z.doinit()
-	C._mpz_div_2exp(&z.i[0], &x.i[0], C.ulong(s))
+	C._mpz_div_2exp(z.ptr, x.ptr, C.ulong(s))
 	return z
 }
 
@@ -453,7 +461,7 @@ func (z *Int) Rsh(x *Int, s uint) *Int {
 // returns (x>>i)&1. The bit index i must be >= 0.
 func (x *Int) Bit(i int) uint {
 	x.doinit()
-	return uint(C.mpz_tstbit(&x.i[0], C.mp_bitcnt_t(i)))
+	return uint(C.mpz_tstbit(x.ptr, C.mp_bitcnt_t(i)))
 }
 
 // SetBit sets z to x, with x's i'th bit set to b (0 or 1).
@@ -470,9 +478,9 @@ func (z *Int) SetBit(x *Int, i int, b uint) *Int {
 	z.Set(x)
 	switch b {
 	case 0:
-		C.mpz_clrbit(&z.i[0], C.mp_bitcnt_t(i))
+		C.mpz_clrbit(z.ptr, C.mp_bitcnt_t(i))
 	case 1:
-		C.mpz_setbit(&z.i[0], C.mp_bitcnt_t(i))
+		C.mpz_setbit(z.ptr, C.mp_bitcnt_t(i))
 	default:
 		panic("set bit is not 0 or 1")
 	}
@@ -484,7 +492,7 @@ func (z *Int) And(x, y *Int) *Int {
 	z.doinit()
 	x.doinit()
 	y.doinit()
-	C.mpz_and(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_and(z.ptr, x.ptr, y.ptr)
 	return z
 }
 
@@ -504,7 +512,7 @@ func (z *Int) Or(x, y *Int) *Int {
 	z.doinit()
 	x.doinit()
 	y.doinit()
-	C.mpz_ior(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_ior(z.ptr, x.ptr, y.ptr)
 	return z
 }
 
@@ -513,7 +521,7 @@ func (z *Int) Xor(x, y *Int) *Int {
 	z.doinit()
 	x.doinit()
 	y.doinit()
-	C.mpz_xor(&z.i[0], &x.i[0], &y.i[0])
+	C.mpz_xor(z.ptr, x.ptr, y.ptr)
 	return z
 }
 
@@ -521,7 +529,7 @@ func (z *Int) Xor(x, y *Int) *Int {
 func (z *Int) Not(x *Int) *Int {
 	z.doinit()
 	x.doinit()
-	C.mpz_com(&z.i[0], &x.i[0])
+	C.mpz_com(z.ptr, x.ptr)
 	return z
 }
 
@@ -539,10 +547,10 @@ func (z *Int) Exp(x, y, m *Int) *Int {
 			z := NewInt(1)
 			return z
 		}
-		C.mpz_pow_ui(&z.i[0], &x.i[0], C.mpz_get_ui(&y.i[0]))
+		C.mpz_pow_ui(z.ptr, x.ptr, C.mpz_get_ui(y.ptr))
 	} else {
 		m.doinit()
-		C.mpz_powm(&z.i[0], &x.i[0], &y.i[0], &m.i[0])
+		C.mpz_powm(z.ptr, x.ptr, y.ptr, m.ptr)
 	}
 	return z
 }
@@ -551,7 +559,7 @@ func (z *Int) Exp(x, y, m *Int) *Int {
 func (z *Int) Sqrt(x *Int) *Int {
 	z.doinit()
 	x.doinit()
-	C.mpz_sqrt(&z.i[0], &x.i[0])
+	C.mpz_sqrt(z.ptr, x.ptr)
 	return z
 }
 
@@ -561,7 +569,7 @@ func (z *Int) Int64() int64 {
 	if !z.init {
 		return 0
 	}
-	return int64(C.mpz_get_si(&z.i[0]))
+	return int64(C.mpz_get_si(z.ptr))
 }
 
 // Uint64 returns the uint64 representation of x. If x cannot be
@@ -570,14 +578,14 @@ func (z *Int) Uint64() uint64 {
 	if !z.init {
 		return 0
 	}
-	return uint64(C.mpz_get_ui(&z.i[0]))
+	return uint64(C.mpz_get_ui(z.ptr))
 }
 
 // Neg sets z = -x and returns z.
 func (z *Int) Neg(x *Int) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_neg(&z.i[0], &x.i[0])
+	C.mpz_neg(z.ptr, x.ptr)
 	return z
 }
 
@@ -585,7 +593,7 @@ func (z *Int) Neg(x *Int) *Int {
 func (z *Int) Abs(x *Int) *Int {
 	x.doinit()
 	z.doinit()
-	C.mpz_abs(&z.i[0], &x.i[0])
+	C.mpz_abs(z.ptr, x.ptr)
 	return z
 }
 
@@ -597,7 +605,7 @@ func (z *Int) Abs(x *Int) *Int {
 //
 func (z *Int) Sign() int {
 	z.doinit()
-	return int(C._mpz_sgn(&z.i[0]))
+	return int(C._mpz_sgn(z.ptr))
 }
 
 // Cmp compares x and y. The result is
@@ -609,7 +617,7 @@ func (z *Int) Sign() int {
 func (x *Int) Cmp(y *Int) int {
 	x.doinit()
 	y.doinit()
-	return int(C.mpz_cmp(&x.i[0], &y.i[0]))
+	return int(C.mpz_cmp(x.ptr, y.ptr))
 }
 
 /*
@@ -621,5 +629,5 @@ func (x *Int) Cmp(y *Int) int {
 // If it returns false, z is not prime.
 func (z *Int) ProbablyPrime(n int) bool {
 	z.doinit()
-	return int(C.mpz_probab_prime_p(&z.i[0], C.int(n))) > 0
+	return int(C.mpz_probab_prime_p(z.ptr, C.int(n))) > 0
 }

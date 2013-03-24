@@ -13,6 +13,16 @@ package gmp
 #cgo LDFLAGS: -lgmp
 #include <gmp.h>
 #include <stdlib.h>
+
+// Wrap theses macros so we can get a pointer to the denominator of q.
+// This allows q.Num() and q.Denom() to be references to the numerator and
+// denominator of q, not copies. This matches the Go1.1 behavior.
+mpz_ptr _mpq_numref(mpq_t q) {
+	return mpq_numref(q);
+}
+mpz_ptr _mpq_denref(mpq_t q) {
+	return mpq_denref(q);
+}
 */
 import "C"
 
@@ -68,7 +78,7 @@ func (q *Rat) SetUint(x, y uint) *Rat {
 func (q *Rat) SetInt(x *Int) *Rat {
 	q.doinit()
 	x.doinit()
-	C.mpq_set_z(&q.i[0], &x.i[0])
+	C.mpq_set_z(&q.i[0], x.ptr)
 	return q
 }
 
@@ -267,32 +277,25 @@ func EqRat(x, y *Rat) bool {
 	return C.mpq_equal(&x.i[0], &y.i[0]) != 0
 }
 
-func (q *Rat) Num(n *Int) *Int {
+// Num returns the numerator of x; it may be <= 0. The result is a reference
+// to x's numerator; it may change if a new value is assigned to x.
+func (q *Rat) Num() *Int {
 	q.doinit()
-	n.doinit()
-	C.mpq_get_num(&n.i[0], &q.i[0])
+	n := new(Int)
+	n.init = true
+	n.ptr = C._mpq_numref(&q.i[0])
 	return n
 }
 
-func (q *Rat) Den(n *Int) *Int {
+// FIXME: Setting the returned denominator to a negative number makes q have
+//        a negative denominator. This is not the case in math/big on Go1.1
+
+// Denom returns the denominator of x; it is always > 0. The result is a
+// reference to x's denominator; it may change if a new value is assigned to x.
+func (q *Rat) Denom() *Int {
 	q.doinit()
-	n.doinit()
-	C.mpq_get_den(&n.i[0], &q.i[0])
+	n := new(Int)
+	n.init = true
+	n.ptr = C._mpq_denref(&q.i[0])
 	return n
 }
-
-func (q *Rat) SetNum(n *Int) *Rat {
-	q.doinit()
-	n.doinit()
-	C.mpq_set_num(&q.i[0], &n.i[0])
-	return q
-}
-
-func (q *Rat) SetDen(n *Int) *Rat {
-	q.doinit()
-	n.doinit()
-	C.mpq_set_den(&q.i[0], &n.i[0])
-	return q
-}
-
-// TODO(ug): mpq_numref, mpq_denref

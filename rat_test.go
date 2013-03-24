@@ -73,3 +73,17 @@ func TestGetString(t *testing.T) {
 		}
 	}
 }
+
+func TestNumDenomAreReferences(t *testing.T) {
+	x := NewRat(1, 2)
+	n := x.Num()
+	d := x.Denom()
+
+	x.Add(x, NewRat(1, 4))
+	if n.Cmp(NewInt(3)) != 0 {
+		t.Error("*Int returned by q.Num() is not a reference to the num. of q.")
+	}
+	if d.Cmp(NewInt(4)) != 0 {
+		t.Error("*Int returned by q.Denom() is not a reference to the den. of q.")
+	}
+}
