@@ -95,6 +95,20 @@ func (q *Rat) SetUint(x, y uint) *Rat {
 	return q
 }
 
+// SetFrac sets z to a/b and returns z.
+func (z *Rat) SetFrac(a, b *Int) *Rat {
+	a.doinit()
+	b.doinit()
+
+	temp_a := new(Rat).SetInt(a)
+	temp_b := new(Rat).SetInt(b)
+	z.Quo(temp_a, temp_b)
+	temp_a.Clear()
+	temp_b.Clear()
+
+	return z
+}
+
 // SetInt sets q to x and returns q.
 func (q *Rat) SetInt(x *Int) *Rat {
 	q.doinit()
@@ -224,6 +238,14 @@ func (q *Rat) Mul(x, y *Rat) *Rat {
 	return q
 }
 
+// Neg sets z to -x and returns z.
+func (z *Rat) Neg(x *Rat) *Rat {
+	z.doinit()
+	x.doinit()
+	C.mpq_neg(&z.i[0], &x.i[0])
+	return z
+}
+
 func (q *Rat) Quo(x, y *Rat) *Rat {
 	x.doinit()
 	y.doinit()
@@ -292,6 +314,16 @@ func CmpRatInt64(q *Rat, x int64, y uint) int {
 	q.doinit()
 	return 0 // FIXME(ug): Macro...
 	//return int(C.mpq_cmp_ui(&x.i[0], C.long(x), C.ulong(y)))
+}
+
+// IsInt returns true if the denominator of x is 1.
+func (q *Rat) IsInt() bool {
+	q.doinit()
+	C.mpq_canonicalize(&q.i[0])
+	if q.Denom().Cmp(intOne) == 0 {
+		return true
+	}
+	return false
 }
 
 // Sign returns:
