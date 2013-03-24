@@ -95,6 +95,21 @@ func TestRatSetString(t *testing.T) {
 	}
 }
 
+func TestRatSign(t *testing.T) {
+	zero := NewRat(0, 1)
+	for _, a := range setStringTests {
+		x, ok := new(Rat).SetString(a.in)
+		if !ok {
+			continue
+		}
+		s := x.Sign()
+		e := x.Cmp(zero)
+		if s != e {
+			t.Errorf("got %d; want %d for z = %v", s, e, &x)
+		}
+	}
+}
+
 var ratCmpTests = []struct {
 	rat1, rat2 string
 	out        int

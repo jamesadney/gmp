@@ -23,6 +23,11 @@ mpz_ptr _mpq_numref(mpq_t q) {
 mpz_ptr _mpq_denref(mpq_t q) {
 	return mpq_denref(q);
 }
+
+// mpq_sgn is a macro
+int _mpq_sgn(mpq_t q) {
+	return mpq_sgn(q);
+}
 */
 import "C"
 
@@ -277,19 +282,15 @@ func CmpRatInt64(q *Rat, x int64, y uint) int {
 	//return int(C.mpq_cmp_ui(&x.i[0], C.long(x), C.ulong(y)))
 }
 
-func (q *Rat) Sgn() int {
-	q.doinit()
-	//TODO(ug): mpf_sgn seems to be implemented as a macro.
-	// We need to watch out for changes in the data structure :(
-
-	//return int(C.mpq_sgn(&f.i[0]))
-	switch size := int(q.i[0]._mp_num._mp_size); {
-	case size < 0:
-		return -1
-	case size == 0:
-		return 0
-	}
-	return 1
+// Sign returns:
+//
+//	-1 if x <  0
+//	 0 if x == 0
+//	+1 if x >  0
+//
+func (x *Rat) Sign() int {
+	x.doinit()
+	return int(C._mpq_sgn(&x.i[0]))
 }
 
 func EqRat(x, y *Rat) bool {
