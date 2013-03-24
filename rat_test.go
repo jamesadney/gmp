@@ -87,3 +87,40 @@ func TestNumDenomAreReferences(t *testing.T) {
 		t.Error("*Int returned by q.Denom() is not a reference to the den. of q.")
 	}
 }
+
+var setFrac64Tests = []struct {
+	x, y int64
+	out  string
+}{
+	{1, 2, "1/2"},
+	{1, -2, "-1/2"},
+	{-1, 2, "-1/2"},
+	{-1, -2, "1/2"},
+	{2, 4, "1/2"},
+}
+
+func TestSetFrac64(t *testing.T) {
+	for i, test := range setFrac64Tests {
+		q := new(Rat).SetFrac64(test.x, test.y)
+		if q.String() != test.out {
+			t.Errorf("#%d SetFrac64(%d, %d) got %s want %s", i, test.x, test.y, q.String(), test.out)
+		}
+	}
+}
+
+var setInt64Tests = []struct {
+	x   int64
+	out string
+}{
+	{1, "1"},
+	{-1, "-1"},
+}
+
+func TestSetInt64(t *testing.T) {
+	for i, test := range setInt64Tests {
+		q := new(Rat).SetInt64(test.x)
+		if q.RatString() != test.out {
+			t.Errorf("#%d SetInt64(%d) got %s want %s", i, test.x, q.RatString(), test.out)
+		}
+	}
+}

@@ -37,7 +37,7 @@ type Rat struct {
 }
 
 // NewRat returns a new Rat initialized to x/y.
-func NewRat(x int64, y uint) *Rat { return new(Rat).SetInt64(x, y) }
+func NewRat(x int64, y int64) *Rat { return new(Rat).SetFrac64(x, y) }
 
 // Int promises that the zero value is a 0, but in gmp
 // the zero value is a crash.  To bridge the gap, the
@@ -60,11 +60,25 @@ func (q *Rat) Set(x *Rat) *Rat {
 	return q
 }
 
-// SetInt64 sets q to x/y and returns q.
-func (q *Rat) SetInt64(x int64, y uint) *Rat {
+// SetFrac64 sets q to x/y and returns q.
+func (q *Rat) SetFrac64(x int64, y int64) *Rat {
 	q.doinit()
+
+	// y has to be positive for mpq_set_si
+	if y < 0 {
+		x *= -1
+		y *= -1
+	}
+
 	C.mpq_set_si(&q.i[0], C.long(x), C.ulong(y))
+	C.mpq_canonicalize(&q.i[0])
 	return q
+}
+
+// SetInt64 sets z to x and returns z.
+func (z *Rat) SetInt64(x int64) *Rat {
+	z.SetFrac64(x, 1)
+	return z
 }
 
 // SetUint sets q to x/y and returns q.
