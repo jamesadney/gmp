@@ -292,7 +292,8 @@ func EqRat(x, y *Rat) bool {
 }
 
 // Num returns the numerator of x; it may be <= 0. The result is a reference
-// to x's numerator; it may change if a new value is assigned to x.
+// to x's numerator; it may change if a new value is assigned to x, and vice
+// versa. The sign of the numerator corresponds to the sign of x.
 func (q *Rat) Num() *Int {
 	q.doinit()
 	n := new(Int)
@@ -305,7 +306,8 @@ func (q *Rat) Num() *Int {
 //        a negative denominator. This is not the case in math/big on Go1.1
 
 // Denom returns the denominator of x; it is always > 0. The result is a
-// reference to x's denominator; it may change if a new value is assigned to x.
+// reference to x's denominator; it may change if a new value is assigned to
+// x, and vice versa.
 func (q *Rat) Denom() *Int {
 	q.doinit()
 	n := new(Int)
