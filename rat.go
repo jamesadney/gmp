@@ -72,20 +72,29 @@ func (q *Rat) SetInt(x *Int) *Rat {
 	return q
 }
 
-// SetString interprets s as a number in the given base
+// SetStringBase interprets s as a number in the given base
 // and sets z to that value.  The base must be in the range [2,36].
 // SetString returns an error if s cannot be parsed or the base is invalid.
-func (q *Rat) SetString(s string, base int) error {
+func (q *Rat) SetStringBase(s string, base int) (*Rat, bool) {
 	q.doinit()
 	if base < 2 || base > 36 {
-		return os.ErrInvalid
+		return nil, false
 	}
 	p := C.CString(s)
 	defer C.free(unsafe.Pointer(p))
 	if C.mpq_set_str(&q.i[0], p, C.int(base)) < 0 {
-		return os.ErrInvalid
+		return nil, false
 	}
-	return nil
+	C.mpq_canonicalize(&q.i[0])
+	return q, true
+}
+
+// SetString sets z to the value of s and returns z and a boolean indicating
+// success. s can be given as a fraction "a/b" or as a floating-point number
+// optionally followed by an exponent. If the operation failed, the value of
+// z is undefined but the returned value is nil.
+func (q *Rat) SetString(s string) (*Rat, bool) {
+	return q.SetStringBase(s, 10)
 }
 
 func SwapRat(x, y *Rat) {
@@ -94,7 +103,7 @@ func SwapRat(x, y *Rat) {
 	C.mpq_swap(&x.i[0], &y.i[0])
 }
 
-// String returns the decimal representation of z.
+// String returns the representation of z in the given base.
 func (q *Rat) StringBase(base int) (string, error) {
 	if q == nil {
 		return "nil", nil
@@ -109,8 +118,20 @@ func (q *Rat) StringBase(base int) (string, error) {
 	return s, nil
 }
 
-func (q *Rat) String() string {
+// RatString returns a string representation of z in the form "a/b" if b != 1,
+// and in the form "a" if b == 1.
+func (q *Rat) RatString() string {
 	s, _ := q.StringBase(10)
+	return s
+}
+
+// String returns a string representation of z in the form "a/b"
+// (even if b == 1).
+func (q *Rat) String() string {
+	s := q.RatString()
+	if len(s) < 3 { // s not in the form a/b
+		s = s + "/1"
+	}
 	return s
 }
 
