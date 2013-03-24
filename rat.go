@@ -41,7 +41,7 @@ type Rat struct {
 	init bool
 }
 
-// NewRat returns a new Rat initialized to x/y.
+// NewRat creates a new Rat with numerator a and denominator b.
 func NewRat(x int64, y int64) *Rat { return new(Rat).SetFrac64(x, y) }
 
 // Int promises that the zero value is a 0, but in gmp
@@ -194,7 +194,7 @@ func (q *Rat) Clear() {
 	q.destroy()
 }
 
-// Add sets q = x + y and returns f.
+// Add sets z to the sum x+y and returns z.
 func (q *Rat) Add(x, y *Rat) *Rat {
 	x.doinit()
 	y.doinit()
@@ -227,6 +227,7 @@ func (q *Rat) Quo(x, y *Rat) *Rat {
 	return q
 }
 
+// Abs sets z to |x| (the absolute value of x) and returns z.
 func (q *Rat) Abs(x *Rat) *Rat {
 	x.doinit()
 	q.doinit()
@@ -257,6 +258,12 @@ func (q *Rat) Div2Exp(x *Rat, s uint) *Rat {
 	return q
 }
 
+// Cmp compares x and y and returns:
+//
+//   -1 if x <  y
+//    0 if x == y
+//   +1 if x >  y
+//
 func (x *Rat) Cmp(y *Rat) int {
 	x.doinit()
 	y.doinit()
