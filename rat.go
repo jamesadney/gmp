@@ -214,7 +214,7 @@ func (q *Rat) Mul(x, y *Rat) *Rat {
 	return q
 }
 
-func (q *Rat) Div(x, y *Rat) *Rat {
+func (q *Rat) Quo(x, y *Rat) *Rat {
 	x.doinit()
 	y.doinit()
 	q.doinit()
