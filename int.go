@@ -48,9 +48,6 @@ type Int struct {
 	init bool
 }
 
-// NewInt returns a new Int initialized to x.
-func NewInt(x int64) *Int { return new(Int).SetInt64(x) }
-
 // Int promises that the zero value is a 0, but in gmp
 // the zero value is a crash.  To bridge the gap, the
 // init bool says whether this is a valid gmp value.
@@ -69,12 +66,47 @@ func (z *Int) doinit() {
 	C.mpz_init(z.ptr)
 }
 
+// Free the space occupied by the underlying gmp object.
+func (z *Int) Clear() {
+	if z.init {
+		C.mpz_clear(z.ptr)
+	}
+	z.init = false
+}
+
+/*
+ * assigning and converting
+ */
+
+// NewInt returns a new Int initialized to x.
+func NewInt(x int64) *Int { return new(Int).SetInt64(x) }
+
+// Set sets z = x and returns z.
+func (z *Int) Set(x *Int) *Int {
+	z.doinit()
+	C.mpz_set(z.ptr, x.ptr)
+	return z
+}
+
 // Bytes returns z's representation as a big-endian byte array.
 func (z *Int) Bytes() []byte {
 	b := make([]byte, (z.Len()+7)/8)
 	n := C.size_t(len(b))
 	C.mpz_export(unsafe.Pointer(&b[0]), &n, 1, 1, 1, 0, z.ptr)
 	return b[0:n]
+}
+
+// SetBytes interprets b as the bytes of a big-endian integer
+// and sets z to that value.
+func (z *Int) SetBytes(b []byte) *Int {
+	z.doinit()
+	if len(b) == 0 {
+		z.SetInt64(0)
+	} else {
+		C.mpz_import(z.ptr, C.size_t(len(b)), 1, 1, 1, 0,
+			unsafe.Pointer(&b[0]))
+	}
+	return z
 }
 
 // BitLen returns the length of the absolute value of z in bits.
@@ -93,24 +125,13 @@ func (z *Int) Len() int {
 	return int(C.mpz_sizeinbase(z.ptr, 2))
 }
 
-// Set sets z = x and returns z.
-func (z *Int) Set(x *Int) *Int {
-	z.doinit()
-	C.mpz_set(z.ptr, x.ptr)
-	return z
-}
-
-// SetBytes interprets b as the bytes of a big-endian integer
-// and sets z to that value.
-func (z *Int) SetBytes(b []byte) *Int {
-	z.doinit()
-	if len(b) == 0 {
-		z.SetInt64(0)
-	} else {
-		C.mpz_import(z.ptr, C.size_t(len(b)), 1, 1, 1, 0,
-			unsafe.Pointer(&b[0]))
+// Int64 returns the int64 representation of x. If x cannot be represented
+// in an int64, the result is undefined.
+func (z *Int) Int64() int64 {
+	if !z.init {
+		return 0
 	}
-	return z
+	return int64(C.mpz_get_si(z.ptr))
 }
 
 // SetInt64 sets z = x and returns z.
@@ -121,11 +142,40 @@ func (z *Int) SetInt64(x int64) *Int {
 	return z
 }
 
+// Uint64 returns the uint64 representation of x. If x cannot be
+// represented in an uint64, the result is undefined.
+func (z *Int) Uint64() uint64 {
+	if !z.init {
+		return 0
+	}
+	return uint64(C.mpz_get_ui(z.ptr))
+}
+
 // SetUint64 sets z to x and returns z.
 func (z *Int) SetUint64(x uint64) *Int {
 	z.doinit()
 	C.mpz_set_ui(z.ptr, C.ulong(x))
 	return z
+}
+
+// String returns the decimal representation of z.
+func (z *Int) String() string {
+	s, _ := z.StringBase(10)
+	return s
+}
+
+func (z *Int) StringBase(base int) (string, error) {
+	if z == nil {
+		return "nil", nil
+	}
+	if base < 2 || base > 36 {
+		return "", os.ErrInvalid
+	}
+	z.doinit()
+	p := C.mpz_get_str(nil, C.int(base), z.ptr)
+	s := C.GoString(p)
+	C.free(unsafe.Pointer(p))
+	return s, nil
 }
 
 // SetString sets z to the value of s, interpreted in the given base,
@@ -166,37 +216,6 @@ func (z *Int) SetString(s string, base int) (*Int, bool) {
 		return nil, false
 	}
 	return z, true
-}
-
-// String returns the decimal representation of z.
-func (z *Int) String() string {
-	s, _ := z.StringBase(10)
-	return s
-}
-
-func (z *Int) StringBase(base int) (string, error) {
-	if z == nil {
-		return "nil", nil
-	}
-	if base < 2 || base > 36 {
-		return "", os.ErrInvalid
-	}
-	z.doinit()
-	p := C.mpz_get_str(nil, C.int(base), z.ptr)
-	s := C.GoString(p)
-	C.free(unsafe.Pointer(p))
-	return s, nil
-}
-
-func (z *Int) destroy() {
-	if z.init {
-		C.mpz_clear(z.ptr)
-	}
-	z.init = false
-}
-
-func (z *Int) Clear() {
-	z.destroy()
 }
 
 /*
@@ -401,45 +420,55 @@ func (z *Int) DivMod(x, y, m *Int) (*Int, *Int) {
 	return z, m
 }
 
-// ModInverse sets z to the multiplicative inverse of g in the group ℤ/pℤ
-// (where p is a prime) and returns z.
-func (z *Int) ModInverse(g, p *Int) *Int {
-	g.doinit()
-	p.doinit()
+// Exp sets z = x^y % m and returns z. If m != nil, negative exponents are
+// allowed if x^-1 mod m exists. If the inverse doesn't exist then a
+// division-by-zero run-time panic occurs.
+//
+// If m == nil, Exp sets z = x^y for positive y and 1 for negative y.
+func (z *Int) Exp(x, y, m *Int) *Int {
+	x.doinit()
+	y.doinit()
 	z.doinit()
-	C.mpz_invert(z.ptr, g.ptr, p.ptr)
+	if m == nil || m.Cmp(intZero) == 0 {
+		if y.Sign() == -1 {
+			z := NewInt(1)
+			return z
+		}
+		C.mpz_pow_ui(z.ptr, x.ptr, C.mpz_get_ui(y.ptr))
+	} else {
+		m.doinit()
+		C.mpz_powm(z.ptr, x.ptr, y.ptr, m.ptr)
+	}
 	return z
 }
 
-// GCD sets z to the greatest common divisor of a and b, which must be positive
-// numbers, and returns z. If x and y are not nil, GCD sets x and y such that
-// z = a*x + b*y. If either a or b is not positive, GCD sets z = x = y = 0.
-func (z *Int) GCD(x, y, a, b *Int) *Int {
+// Sqrt sets z = floor(sqrt(x)) and returns z.
+func (z *Int) Sqrt(x *Int) *Int {
 	z.doinit()
-
-	// Compatibility with math/big
-	if a.Cmp(intZero) <= 0 || b.Cmp(intZero) <= 0 {
-		z.Set(intZero)
-		return z
-	}
-
-	// allow for nil x and y
-	var x_ptr C.mpz_ptr = nil
-	if x != nil {
-		x.doinit()
-		x_ptr = x.ptr
-	}
-	var y_ptr C.mpz_ptr = nil
-	if y != nil {
-		y.doinit()
-		y_ptr = y.ptr
-	}
-
-	a.doinit()
-	b.doinit()
-	C.mpz_gcdext(z.ptr, x_ptr, y_ptr, a.ptr, b.ptr)
+	x.doinit()
+	C.mpz_sqrt(z.ptr, x.ptr)
 	return z
 }
+
+// Neg sets z = -x and returns z.
+func (z *Int) Neg(x *Int) *Int {
+	x.doinit()
+	z.doinit()
+	C.mpz_neg(z.ptr, x.ptr)
+	return z
+}
+
+// Abs sets z to the absolute value of x and returns z.
+func (z *Int) Abs(x *Int) *Int {
+	x.doinit()
+	z.doinit()
+	C.mpz_abs(z.ptr, x.ptr)
+	return z
+}
+
+/*
+ * logic and bit fiddling
+ */
 
 // Lsh sets z = x << s and returns z.
 func (z *Int) Lsh(x *Int, s uint) *Int {
@@ -454,36 +483,6 @@ func (z *Int) Rsh(x *Int, s uint) *Int {
 	x.doinit()
 	z.doinit()
 	C._mpz_div_2exp(z.ptr, x.ptr, C.ulong(s))
-	return z
-}
-
-// Bit returns the value of the i'th bit of x. That is, it
-// returns (x>>i)&1. The bit index i must be >= 0.
-func (x *Int) Bit(i int) uint {
-	x.doinit()
-	return uint(C.mpz_tstbit(x.ptr, C.mp_bitcnt_t(i)))
-}
-
-// SetBit sets z to x, with x's i'th bit set to b (0 or 1).
-// That is, if bit is 1 SetBit sets z = x | (1 << i);
-// if bit is 0 it sets z = x &^ (1 << i). If bit is not 0 or 1,
-// SetBit will panic.
-func (z *Int) SetBit(x *Int, i int, b uint) *Int {
-	z.doinit()
-
-	if i < 0 {
-		panic("negative bit index")
-	}
-
-	z.Set(x)
-	switch b {
-	case 0:
-		C.mpz_clrbit(z.ptr, C.mp_bitcnt_t(i))
-	case 1:
-		C.mpz_setbit(z.ptr, C.mp_bitcnt_t(i))
-	default:
-		panic("set bit is not 0 or 1")
-	}
 	return z
 }
 
@@ -533,69 +532,91 @@ func (z *Int) Not(x *Int) *Int {
 	return z
 }
 
-// Exp sets z = x^y % m and returns z. If m != nil, negative exponents are
-// allowed if x^-1 mod m exists. If the inverse doesn't exist then a
-// division-by-zero run-time panic occurs.
-//
-// If m == nil, Exp sets z = x^y for positive y and 1 for negative y.
-func (z *Int) Exp(x, y, m *Int) *Int {
+// Bit returns the value of the i'th bit of x. That is, it
+// returns (x>>i)&1. The bit index i must be >= 0.
+func (x *Int) Bit(i int) uint {
 	x.doinit()
-	y.doinit()
+	return uint(C.mpz_tstbit(x.ptr, C.mp_bitcnt_t(i)))
+}
+
+// SetBit sets z to x, with x's i'th bit set to b (0 or 1).
+// That is, if bit is 1 SetBit sets z = x | (1 << i);
+// if bit is 0 it sets z = x &^ (1 << i). If bit is not 0 or 1,
+// SetBit will panic.
+func (z *Int) SetBit(x *Int, i int, b uint) *Int {
 	z.doinit()
-	if m == nil || m.Cmp(intZero) == 0 {
-		if y.Sign() == -1 {
-			z := NewInt(1)
-			return z
-		}
-		C.mpz_pow_ui(z.ptr, x.ptr, C.mpz_get_ui(y.ptr))
-	} else {
-		m.doinit()
-		C.mpz_powm(z.ptr, x.ptr, y.ptr, m.ptr)
+
+	if i < 0 {
+		panic("negative bit index")
+	}
+
+	z.Set(x)
+	switch b {
+	case 0:
+		C.mpz_clrbit(z.ptr, C.mp_bitcnt_t(i))
+	case 1:
+		C.mpz_setbit(z.ptr, C.mp_bitcnt_t(i))
+	default:
+		panic("set bit is not 0 or 1")
 	}
 	return z
 }
 
-// Sqrt sets z = floor(sqrt(x)) and returns z.
-func (z *Int) Sqrt(x *Int) *Int {
+/*
+ * number theory
+ */
+
+// ModInverse sets z to the multiplicative inverse of g in the group ℤ/pℤ
+// (where p is a prime) and returns z.
+func (z *Int) ModInverse(g, p *Int) *Int {
+	g.doinit()
+	p.doinit()
 	z.doinit()
-	x.doinit()
-	C.mpz_sqrt(z.ptr, x.ptr)
+	C.mpz_invert(z.ptr, g.ptr, p.ptr)
 	return z
 }
 
-// Int64 returns the int64 representation of x. If x cannot be represented
-// in an int64, the result is undefined.
-func (z *Int) Int64() int64 {
-	if !z.init {
-		return 0
+// GCD sets z to the greatest common divisor of a and b, which must be positive
+// numbers, and returns z. If x and y are not nil, GCD sets x and y such that
+// z = a*x + b*y. If either a or b is not positive, GCD sets z = x = y = 0.
+func (z *Int) GCD(x, y, a, b *Int) *Int {
+	z.doinit()
+
+	// Compatibility with math/big
+	if a.Cmp(intZero) <= 0 || b.Cmp(intZero) <= 0 {
+		z.Set(intZero)
+		return z
 	}
-	return int64(C.mpz_get_si(z.ptr))
-}
 
-// Uint64 returns the uint64 representation of x. If x cannot be
-// represented in an uint64, the result is undefined.
-func (z *Int) Uint64() uint64 {
-	if !z.init {
-		return 0
+	// allow for nil x and y
+	var x_ptr C.mpz_ptr = nil
+	if x != nil {
+		x.doinit()
+		x_ptr = x.ptr
 	}
-	return uint64(C.mpz_get_ui(z.ptr))
-}
+	var y_ptr C.mpz_ptr = nil
+	if y != nil {
+		y.doinit()
+		y_ptr = y.ptr
+	}
 
-// Neg sets z = -x and returns z.
-func (z *Int) Neg(x *Int) *Int {
-	x.doinit()
-	z.doinit()
-	C.mpz_neg(z.ptr, x.ptr)
+	a.doinit()
+	b.doinit()
+	C.mpz_gcdext(z.ptr, x_ptr, y_ptr, a.ptr, b.ptr)
 	return z
 }
 
-// Abs sets z to the absolute value of x and returns z.
-func (z *Int) Abs(x *Int) *Int {
-	x.doinit()
+// ProbablyPrime performs n Miller-Rabin tests to check whether z is prime.
+// If it returns true, z is prime with probability 1 - 1/4^n.
+// If it returns false, z is not prime.
+func (z *Int) ProbablyPrime(n int) bool {
 	z.doinit()
-	C.mpz_abs(z.ptr, x.ptr)
-	return z
+	return int(C.mpz_probab_prime_p(z.ptr, C.int(n))) > 0
 }
+
+/*
+ * comparisons
+ */
 
 // Sign returns:
 //
@@ -624,16 +645,4 @@ func (x *Int) Cmp(y *Int) int {
 		return 0
 	}
 	return 1
-}
-
-/*
- * functions without a clear receiver
- */
-
-// ProbablyPrime performs n Miller-Rabin tests to check whether z is prime.
-// If it returns true, z is prime with probability 1 - 1/4^n.
-// If it returns false, z is not prime.
-func (z *Int) ProbablyPrime(n int) bool {
-	z.doinit()
-	return int(C.mpz_probab_prime_p(z.ptr, C.int(n))) > 0
 }
